@@ -235,3 +235,183 @@ Target test count: ~25.
 - **Frame-rate handling.** v0.2 approximates frame counts at 30 fps. Real broadcast iTT files declare `frameRate="29.97"` with drop-frame; revisit if anyone hits inaccuracy.
 - **Multiple `<body>` languages.** TTML allows multiple `<body>` blocks with different `xml:lang`. v0.2 reads only the first; a v0.4+ multi-language Caption surface would expose all.
 - **Element name case.** TTML is XML — case-sensitive. v0.2 expects lowercase `body` / `div` / `p` / `span` / `br`. FCP and iTunes both emit lowercase; revisit if a producer ships uppercase.
+
+## v0.3.0 design — Styled captions → TextOverlay bridge
+
+The biggest leap of the cycle. v0.1 / v0.2 stripped VTT cue settings and inline styles to plain text — adequate for `AVMetadataItem` ingest, but not for visual rendering. v0.3 adds a parallel parser path that **preserves** styling, plus a bridge that maps a styled cue onto kadr v0.8's `TextOverlay` + `textAnimation`. Now consumers can render captions as styled, animated overlays baked into the video — not just as system metadata.
+
+### Problem
+
+A real "captions on TikTok / Reels"-style overlay can't come from `AVMetadataItem` cues: those are surfaced through the OS's caption picker, which most third-party apps don't show. Apps that want captions burned into the export need to drop styled text overlays at the cue's time range. v0.3 is that path.
+
+### Scope lock
+
+In scope:
+- **`StyledCaption`** value type — text + timeRange + alignment + line position + bold / italic flags + speaker name. `Sendable` + `Equatable`.
+- **`CaptionParser.parseStyledVTT(_:)`** — pure string parser. Same VTT shape as `parseVTT`, but cue settings (`align:`, `position:`, `line:`) and inline styles (`<i>`, `<b>`, `<u>`, `<c.classname>`, `<v Speaker>`) are **preserved** as `StyledCaption` fields rather than stripped.
+- **`Caption.loadStyled(vtt:)`** — async file loader.
+- **`StyledCaption.toTextOverlay(baseStyle:animation:)`** — bridge to `Kadr.TextOverlay`. Maps `alignment` → `TextStyle.Alignment`, line position → overlay `position` + `anchor`, bold flag → `TextStyle.Weight.bold`, italic flag → font selection (system italic via `.custom`), `visibilityRange` set from `timeRange`.
+- **`Video.styledCaptions(_:baseStyle:animation:)`** — convenience modifier that overlays each `StyledCaption` on the composition with its own `visibilityRange`.
+
+Out of scope (v0.3.x or later):
+- **Mixed inline styling within a cue** — "`<i>partly</i> italic, `<b>partly</b>` bold" needs multiple text runs per cue. `TextOverlay` is single-style; a future version could split into multiple overlays or wait for a multi-run text type in kadr core. v0.3 collapses to "any italic in the cue → whole cue italic" (last-tag-wins behavior is rare in the wild).
+- **Styled iTT bridge** — iTT styling is much bigger (CSS-style `tts:color`, `tts:fontSize`, regions). Defer to v0.3.x or v0.4+ on demand. v0.3 ships VTT-only on the styled path.
+- **`<u>` underline** — `Kadr.TextStyle` has no underline field today. Surfaced on `StyledCaption.isUnderlined` for forward compat but doesn't affect the overlay output until kadr core grows it.
+- **`<c.classname>`-driven styling** — v0.3 records the classnames on `StyledCaption.classes: [String]` but doesn't apply them. Real WebVTT styling needs a `STYLE` block parser to map classnames to colors / fonts; defer to v0.3.x.
+- **Per-character animation** (typewriter / kinetic captions) — would require kadr v0.8's `textAnimation` to support "reveal by character." The bridge passes through whatever `animation` argument the caller hands in; per-character text isn't a v0.3 concern.
+
+### API examples
+
+```swift
+import Kadr
+import KadrCaptions
+
+// 1. Parse + bridge in one go
+let cues = try await Caption.loadStyled(vtt: vttURL)
+let video = Video {
+    VideoClip(url: footage)
+}
+.styledCaptions(cues)
+
+// 2. Customize the base style (font / color) — the parser's bold/italic flags
+// override the base style's weight when set.
+var titleStyle = TextStyle.default
+titleStyle.fontSize = 56
+titleStyle.color = .white
+let video2 = Video {
+    VideoClip(url: footage)
+}
+.styledCaptions(cues, baseStyle: titleStyle)
+
+// 3. Add a fade-in animation to every styled caption
+let video3 = Video {
+    VideoClip(url: footage)
+}
+.styledCaptions(cues, animation: .fadeIn(duration: 0.3))
+
+// 4. Hand-built styled caption (no file)
+let cue = StyledCaption(
+    text: "MY MOVIE",
+    timeRange: CMTimeRange(start: .zero, duration: cmt(2)),
+    alignment: .center,
+    line: .top,
+    position: 0.5,
+    isBold: true,
+    isItalic: false,
+    speaker: nil,
+    classes: []
+)
+let overlay = cue.toTextOverlay()
+```
+
+### Public surface sketch
+
+```swift
+public struct StyledCaption: Sendable, Equatable {
+    public let text: String
+    public let timeRange: CMTimeRange
+    /// Horizontal alignment of the cue text within its layout box. Maps to
+    /// `Kadr.TextStyle.Alignment`.
+    public let alignment: StyledCaptionAlignment
+    /// Vertical placement on the render canvas. WebVTT's `line:` setting.
+    public let line: StyledCaptionLine
+    /// Horizontal position in `0...1`. WebVTT's `position:` setting; default `0.5`
+    /// (centered).
+    public let position: Double
+    public let isBold: Bool
+    public let isItalic: Bool
+    /// `<u>` underline. Recorded for forward compatibility; not yet rendered (kadr
+    /// `TextStyle` doesn't expose underline as of kadr 0.9).
+    public let isUnderlined: Bool
+    /// `<v Speaker>` tag's payload, if present. Useful for callers wanting to
+    /// prepend the speaker's name in their own overlay layout.
+    public let speaker: String?
+    /// Classnames from `<c.foo.bar>...</c>` tags. Recorded for forward compat with
+    /// the v0.3.x `<STYLE>`-block parser.
+    public let classes: [String]
+}
+
+public enum StyledCaptionAlignment: Sendable, Equatable {
+    case start    // == .leading in TextStyle
+    case center
+    case end      // == .trailing in TextStyle
+}
+
+public enum StyledCaptionLine: Sendable, Equatable {
+    /// Default WebVTT placement — bottom of the render canvas.
+    case auto
+    case top
+    case bottom
+    /// Explicit vertical position in `0...100` (percent of canvas height from top).
+    case percent(Double)
+}
+
+public extension CaptionParser {
+    static func parseStyledVTT(_ content: String) throws -> [StyledCaption]
+}
+
+public extension Caption {
+    static func loadStyled(vtt url: URL) async throws -> [StyledCaption]
+}
+
+public extension StyledCaption {
+    /// Build a `TextOverlay` rendering this caption. `baseStyle`'s font / color /
+    /// weight apply unless overridden by the cue's own bold / italic flags.
+    /// `visibilityRange` is set from `timeRange`. If `animation` is non-nil it's
+    /// attached unchanged.
+    func toTextOverlay(
+        baseStyle: TextStyle = .default,
+        animation: (any TextAnimation)? = nil
+    ) -> TextOverlay
+}
+
+public extension Video {
+    /// Overlay every styled caption onto the composition. Each becomes a
+    /// `TextOverlay` with its own `visibilityRange` and the supplied base style /
+    /// animation.
+    func styledCaptions(
+        _ captions: [StyledCaption],
+        baseStyle: TextStyle = .default,
+        animation: (any TextAnimation)? = nil
+    ) -> Video
+}
+```
+
+### Engine notes
+
+- **Reuse VTT block / cue scanning.** `parseStyledVTT` shares the WEBVTT-header / NOTE / REGION / STYLE / cue-identifier skipping with `parseVTT`. The difference is in handling the timestamp line's trailing settings and the cue-text's inline tags.
+- **Cue setting parsing.** Tokenize the trailing portion of the timestamp line by whitespace, then split each token on the first `:`. Recognize `align`, `line`, `position`. Unrecognized settings are ignored.
+- **Inline tag handling.** Scan the cue text for `<...>` tags. For each tag:
+  - `<i>` / `</i>`, `<b>` / `</b>`, `<u>` / `</u>` → toggle the respective flag on the cue (`isItalic` / `isBold` / `isUnderlined`).
+  - `<c.foo.bar>` → record `["foo", "bar"]` in `classes` (additive across tags).
+  - `<v Speaker>...</v>` → record `Speaker` as `speaker`.
+  - `<00:00:01.500>` → ignored (timed-text marker, no plain-text equivalent).
+  - All tags are stripped from the resulting `text` field; the styling is recorded as flags / classes / speaker.
+- **Bridge math.** `StyledCaptionLine.auto` / `.bottom` → overlay `position = .normalized(x: position, y: 0.92)`, `anchor = .bottom`. `.top` → `y: 0.08`, `anchor = .top`. `.percent(p)` → `y: p / 100.0`, anchor follows whichever side it's nearer to (top half → `.top`, bottom half → `.bottom`).
+- **Italic via custom font.** kadr `TextStyle` has no italic flag. The bridge synthesizes italic by passing a system italic font name (`"Helvetica-Oblique"` / `"-apple-system,italic"` not portable; we use `"Helvetica-Oblique"` which is available on every Apple platform). Documented limitation; revisit when kadr `TextStyle` grows an italic field.
+
+### Tier breakdown
+
+- **Tier 1** — `StyledCaption` value type + `parseStyledVTT` + `Caption.loadStyled(vtt:)`. ~300 LOC + tests.
+- **Tier 2** — `StyledCaption.toTextOverlay(baseStyle:animation:)` + `Video.styledCaptions(_:baseStyle:animation:)`. ~120 LOC + tests.
+- **Tier 3** — Release prep + ship as **v0.3.0**.
+
+### Test strategy
+
+- **Parser** — well-formed cue with `align:start position:25%` settings → `StyledCaption.alignment == .start`, `position == 0.25`. Inline tag flag toggling: `<i>...</i>`, `<b>...</b>`, `<u>...</u>`, nested combinations. `<v Speaker>` extraction. `<c.foo.bar>` classnames. Multi-cue documents with mixed styling. Round-trip through `parseStyledVTT` + `parseVTT` plain text agreement (the styled parser's stripped text == plain parser's text).
+- **Bridge** — alignment mapping (`.start` → `TextStyle.Alignment.leading`), line mapping (`.top` / `.bottom` / `.percent(50)`), bold flag → `TextStyle.Weight.bold`, italic flag → italic font name, `visibilityRange` matches `timeRange`, animation passed through.
+- **`Video.styledCaptions`** — adds N overlays for N captions; each overlay's `layerID` is unique (auto-generated from the caption index); base style applied unless the cue overrides.
+
+Target test count: ~40 new tests across the cycle. Suite floor: 98 → ~138.
+
+### Compatibility
+
+- KadrCaptions 0.3.0 still requires kadr ≥ 0.9.2 (uses `TextOverlay`, `TextStyle`, `TextAnimation`).
+- Pure additive — every v0.2 call site compiles unchanged.
+
+### Open questions (track in PRs, not blocking RFC merge)
+
+- **Per-cue line-height / leading.** kadr `TextStyle` doesn't expose it. v0.3 doesn't surface it either; revisit.
+- **Right-to-left / vertical text.** WebVTT supports `vertical:rl` / `vertical:lr`. v0.3 ignores. Revisit if anyone hits a real RTL caption file.
+- **Multi-language `<lang>` tags.** Surfaced as `classes` with the language tag prefixed (`["lang:fr"]`)? Or a separate field? Defer until demand.
+- **`<STYLE>` block parsing.** Needed for `<c.classname>`-driven styling to actually apply. v0.3 records classnames; v0.3.x parser maps them to fonts / colors. Tracked separately.
