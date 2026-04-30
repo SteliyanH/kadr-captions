@@ -4,6 +4,60 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-04-30
+
+Styled captions → `Kadr.TextOverlay` bridge. The biggest leap of the cycle: a parser path that **preserves** VTT cue settings and inline styling, plus a bridge that maps a styled cue onto kadr v0.8's `TextOverlay` + `textAnimation`. Consumers can now render captions as styled, animated overlays burned into the export — not just `AVMetadataItem` cues for the OS picker.
+
+### Added
+
+- **`StyledCaption`** value type — text + timeRange + alignment + line position + bold / italic / underline flags + speaker + classes. `Sendable`, `Equatable`.
+- **`StyledCaptionAlignment`** (`.start` / `.center` / `.end`) and **`StyledCaptionLine`** (`.auto` / `.top` / `.bottom` / `.percent(Double)`).
+- **`CaptionParser.parseStyledVTT(_:)`** — pure synchronous string parser. Same WEBVTT-header / NOTE / REGION / STYLE / cue-identifier handling as `parseVTT` but **preserves** cue settings and inline tags as flags / classes / speaker.
+- **`Caption.loadStyled(vtt:)`** — async file loader (UTF-8 default, Windows-1252 fallback).
+- Pure helpers exposed: `parseStyledVTTTimestampLine`, `parseVTTCueSettings`, `extractStyledRuns`.
+- **`StyledCaption.toTextOverlay(baseStyle:animation:)`** — maps a styled cue to `Kadr.TextOverlay` with per-cue `visibilityRange`.
+- **`Video.styledCaptions(_:baseStyle:animation:)`** — convenience modifier; overlays an entire array of styled cues. Accumulates across calls.
+- Pure mapping helpers exposed for tests: `StyledCaption.mapAlignment`, `applyStyling`, `overlayPosition`, `overlayAnchor`.
+
+### Tag handling
+
+"Any tag of this kind appeared in the cue → per-cue flag set":
+- `<i>` / `</i>` → `isItalic`.
+- `<b>` / `</b>` → `isBold`.
+- `<u>` / `</u>` → `isUnderlined` (recorded; not rendered until `Kadr.TextStyle` grows an underline field).
+- `<v Speaker>` → speaker name extracted.
+- `<c.foo.bar>` → classnames appended (recorded; v0.3.x `<STYLE>`-block parser will map them to fonts / colors).
+- `<00:00:01.500>` timed-text markers stripped.
+
+### Bridge mapping
+
+- `alignment` → `TextStyle.Alignment` (`.start` / `.center` / `.end` → `.leading` / `.center` / `.trailing`).
+- `isBold` → `Weight.bold` (preserves `baseStyle.weight` otherwise).
+- `isItalic` → `fontName = "Helvetica-Oblique"`. **Documented limitation:** overrides any non-italic font in `baseStyle.fontName`.
+- `line == .auto` / `.bottom` → `y = 0.92`, anchor on the bottom row.
+- `line == .top` → `y = 0.08`, anchor on the top row.
+- `line == .percent(p)` → `y = p / 100`; anchor decided at midline (top half → top anchor, bottom half → bottom anchor).
+- Horizontal `position` flows through unchanged; `alignment` picks the matching anchor column (`.start` → left, `.center` → center, `.end` → right).
+
+### Critical contract
+
+The plain-text part of every `StyledCaption` equals what `parseVTT` would produce for the same input. Guarantee verified by a round-trip test.
+
+### Tests
+
+- 57 new tests across `StyledVTTTests` (30) and `StyledCaptionBridgeTests` (27). Coverage: cue setting parsing, inline tag extraction (italic / bold / underline / speaker / classes / timed markers / nested tags), full-document parsing, styled VTT vs. plain VTT plain-text agreement, alignment / weight / italic / position / anchor mapping, `Video.styledCaptions` accumulation, animation passthrough. Suite: 98 → 155.
+
+### Compatibility
+
+- Still requires kadr ≥ 0.9.2 (uses `TextOverlay`, `TextStyle`, `TextAnimation`, `Anchor`, `Position`).
+- Pure additive — every v0.2 call site compiles unchanged.
+
+### Notes
+
+- **Mixed inline styling within a cue** is collapsed to per-cue flags. "Half italic, half bold" is recorded as `isItalic = true && isBold = true`; the resulting overlay applies both to the whole cue. Multi-run text is deferred — would need either kadr core to grow a multi-run text type or this package to split a cue into multiple overlays.
+- **Styled iTT bridge** is deferred. TTML styling (CSS-style attributes, regions) is a much bigger surface; revisit on demand.
+- **`<STYLE>`-block parser** that maps `<c.classname>` to actual styling is deferred to v0.3.x. Classnames are recorded today; no automatic application.
+
 ## [0.2.0] - 2026-04-30
 
 iTunes Timed Text (.itt) parser and writer. Completes the "every common subtitle format" story (SRT + VTT + iTT). Pure additive — every v0.1 call site compiles unchanged.
