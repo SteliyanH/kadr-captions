@@ -14,7 +14,8 @@ KadrCaptions consumes kadr v0.9.2's `Caption` value type and `Video.captions(_:)
 import Kadr
 import KadrCaptions
 
-let cues = try await Caption.load(srt: subtitleURL)
+// Auto-detect by extension (.srt / .vtt)
+let cues = try await Caption.load(subtitleURL)
 
 let video = Video {
     VideoClip(url: footage)
@@ -22,7 +23,22 @@ let video = Video {
 .captions(cues)
 
 try await video.export(to: outputURL)  // captions baked as AVMetadataItem at export
+
+// Or write captions back to disk:
+try await CaptionAuthor.writeSRT(cues, to: outputSRT)
+try await CaptionAuthor.writeVTT(cues, to: outputVTT)
 ```
+
+## API
+
+| Surface | Purpose |
+|---|---|
+| `Caption.load(_ url:)` | Auto-detect by extension; dispatches to `load(srt:)` / `load(vtt:)` |
+| `Caption.load(srt:)` / `load(vtt:)` | Async file loaders; UTF-8 default with Windows-1252 fallback |
+| `CaptionParser.parseSRT(_:)` / `parseVTT(_:)` | Pure synchronous string parsers |
+| `CaptionAuthor.writeSRT(_:to:)` / `writeVTT(_:to:)` | Async writers (UTF-8, LF) |
+| `CaptionAuthor.renderSRT(_:)` / `renderVTT(_:)` | Pure render helpers (string form) |
+| `CaptionParseError` | Typed errors with source-line metadata |
 
 ## Why a separate package?
 

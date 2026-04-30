@@ -4,7 +4,7 @@ This document outlines the planned feature releases for KadrCaptions. Each relea
 
 For kadr's roadmap see [kadr/ROADMAP.md](https://github.com/SteliyanH/kadr/blob/main/ROADMAP.md).
 
-## v0.1.0 — SRT + VTT *(planned)*
+## v0.1.0 — SRT + VTT ✓ shipped
 
 The first release. Parses and writes SubRip (.srt) and WebVTT (.vtt) caption files into kadr's `Caption` value type.
 
@@ -34,7 +34,7 @@ Bridges a styled VTT cue (or programmatic builder) onto kadr v0.8's `TextOverlay
 
 | KadrCaptions | Requires Kadr |
 |---|---|
-| 0.1.0 *(planned)* | ≥ 0.9.2 |
+| 0.1.0 | ≥ 0.9.2 |
 | 0.2.0+ *(planned)* | ≥ 0.9.2 |
 
 ## Contributing
