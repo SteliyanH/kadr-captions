@@ -262,4 +262,145 @@ struct ASSTests {
         let cues = try await Caption.load(tmp)
         #expect(cues.count == 2)
     }
+
+    // MARK: - Writer helpers
+
+    private func cmt(_ seconds: Double) -> CMTime {
+        CMTime(seconds: seconds, preferredTimescale: 1000)
+    }
+
+    @Test func formatsASSTimestamp() {
+        #expect(CaptionAuthor.formatASSTimestamp(cmt(0)) == "0:00:00.00")
+        #expect(CaptionAuthor.formatASSTimestamp(cmt(83.45)) == "0:01:23.45")
+        #expect(CaptionAuthor.formatASSTimestamp(cmt(3725.5)) == "1:02:05.50")
+    }
+
+    @Test func formatASSTimestampDoesNotZeroPadHour() {
+        #expect(CaptionAuthor.formatASSTimestamp(cmt(7200)) == "2:00:00.00")
+    }
+
+    @Test func renderASSCueTextConvertsNewlinesToBackslashN() {
+        #expect(CaptionAuthor.renderASSCueText("Line one\nLine two") == "Line one\\NLine two")
+    }
+
+    @Test func renderASSCueTextPassesPlainTextThrough() {
+        #expect(CaptionAuthor.renderASSCueText("plain text") == "plain text")
+    }
+
+    // MARK: - renderASS
+
+    @Test func renderASSHasExpectedHeader() {
+        let cues = [Caption(text: "Hi", timeRange: CMTimeRange(start: cmt(0), duration: cmt(1)))]
+        let out = CaptionAuthor.renderASS(cues)
+        #expect(out.contains("[Script Info]"))
+        #expect(out.contains("ScriptType: v4.00+"))
+        #expect(out.contains("[V4+ Styles]"))
+        #expect(out.contains("[Events]"))
+        #expect(out.contains("Format: Layer, Start, End, Style, Name"))
+    }
+
+    @Test func renderASSEmitsOneDialoguePerCue() {
+        let cues = [
+            Caption(text: "First", timeRange: CMTimeRange(start: cmt(0), duration: cmt(2))),
+            Caption(text: "Second", timeRange: CMTimeRange(start: cmt(2), duration: cmt(3))),
+        ]
+        let out = CaptionAuthor.renderASS(cues)
+        #expect(out.contains("Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,First"))
+        #expect(out.contains("Dialogue: 0,0:00:02.00,0:00:05.00,Default,,0,0,0,,Second"))
+    }
+
+    @Test func renderASSConvertsNewlinesInCueText() {
+        let cues = [Caption(text: "Line\nbreak", timeRange: CMTimeRange(start: cmt(0), duration: cmt(1)))]
+        let out = CaptionAuthor.renderASS(cues)
+        #expect(out.contains(",Line\\Nbreak"))
+    }
+
+    // MARK: - renderSSA
+
+    @Test func renderSSAUsesV400AndMarkedField() {
+        let cues = [Caption(text: "Hi", timeRange: CMTimeRange(start: cmt(0), duration: cmt(1)))]
+        let out = CaptionAuthor.renderSSA(cues)
+        #expect(out.contains("ScriptType: v4.00\n"))
+        #expect(out.contains("[V4 Styles]"))
+        #expect(out.contains("Format: Marked, Start, End, Style"))
+        #expect(out.contains("Dialogue: Marked=0,"))
+    }
+
+    // MARK: - Round-trip
+
+    @Test func roundTripsASSPreservesPlainCaptions() {
+        let cues = [
+            Caption(text: "Hello", timeRange: CMTimeRange(start: cmt(0), duration: cmt(2))),
+            Caption(text: "World", timeRange: CMTimeRange(start: cmt(2), duration: cmt(3))),
+        ]
+        let rendered = CaptionAuthor.renderASS(cues)
+        let reparsed = try! CaptionParser.parseASS(rendered)
+        #expect(reparsed.count == cues.count)
+        for (a, b) in zip(cues, reparsed) {
+            #expect(a.text == b.text)
+            #expect(abs(CMTimeGetSeconds(a.timeRange.start) - CMTimeGetSeconds(b.timeRange.start)) < 0.01)
+            #expect(abs(CMTimeGetSeconds(a.timeRange.duration) - CMTimeGetSeconds(b.timeRange.duration)) < 0.01)
+        }
+    }
+
+    @Test func roundTripsASSPreservesMultilineCaptions() {
+        let cues = [
+            Caption(text: "First\nSecond\nThird", timeRange: CMTimeRange(start: cmt(0), duration: cmt(3))),
+        ]
+        let rendered = CaptionAuthor.renderASS(cues)
+        let reparsed = try! CaptionParser.parseASS(rendered)
+        #expect(reparsed.count == 1)
+        #expect(reparsed[0].text == "First\nSecond\nThird")
+    }
+
+    @Test func roundTripsASSPreservesCommasInText() {
+        let cues = [
+            Caption(text: "One, two, three", timeRange: CMTimeRange(start: cmt(0), duration: cmt(2))),
+        ]
+        let rendered = CaptionAuthor.renderASS(cues)
+        let reparsed = try! CaptionParser.parseASS(rendered)
+        #expect(reparsed[0].text == "One, two, three")
+    }
+
+    @Test func roundTripsSSAPreservesPlainCaptions() {
+        let cues = [
+            Caption(text: "Hello", timeRange: CMTimeRange(start: cmt(0), duration: cmt(2))),
+            Caption(text: "World", timeRange: CMTimeRange(start: cmt(2), duration: cmt(3))),
+        ]
+        let rendered = CaptionAuthor.renderSSA(cues)
+        let reparsed = try! CaptionParser.parseSSA(rendered)
+        #expect(reparsed.count == cues.count)
+        for (a, b) in zip(cues, reparsed) {
+            #expect(a.text == b.text)
+        }
+    }
+
+    // MARK: - File loader round-trip
+
+    @Test func writerRoundTripsThroughDisk() async throws {
+        let cues = [
+            Caption(text: "Round", timeRange: CMTimeRange(start: cmt(0), duration: cmt(1))),
+            Caption(text: "Trip", timeRange: CMTimeRange(start: cmt(1), duration: cmt(2))),
+        ]
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString + ".ass")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try await CaptionAuthor.writeASS(cues, to: tmp)
+        let reparsed = try await Caption.load(ass: tmp)
+        #expect(reparsed.count == 2)
+        #expect(reparsed.map(\.text) == ["Round", "Trip"])
+    }
+
+    @Test func ssaWriterRoundTripsThroughDisk() async throws {
+        let cues = [
+            Caption(text: "S", timeRange: CMTimeRange(start: cmt(0), duration: cmt(1))),
+            Caption(text: "A", timeRange: CMTimeRange(start: cmt(1), duration: cmt(2))),
+        ]
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString + ".ssa")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try await CaptionAuthor.writeSSA(cues, to: tmp)
+        let reparsed = try await Caption.load(ssa: tmp)
+        #expect(reparsed.count == 2)
+    }
 }
