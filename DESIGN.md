@@ -415,3 +415,106 @@ Target test count: ~40 new tests across the cycle. Suite floor: 98 → ~138.
 - **Right-to-left / vertical text.** WebVTT supports `vertical:rl` / `vertical:lr`. v0.3 ignores. Revisit if anyone hits a real RTL caption file.
 - **Multi-language `<lang>` tags.** Surfaced as `classes` with the language tag prefixed (`["lang:fr"]`)? Or a separate field? Defer until demand.
 - **`<STYLE>` block parsing.** Needed for `<c.classname>`-driven styling to actually apply. v0.3 records classnames; v0.3.x parser maps them to fonts / colors. Tracked separately.
+
+## v0.4.0 design — ASS / SSA
+
+The fourth and final caption format. Advanced SubStation Alpha (.ass) and its predecessor SubStation Alpha (.ssa) are heavily used in anime / fansub / streaming pipelines. They share a common structure (INI-style sections + CSV-like event lines) but differ in style-block schemas. v0.4 ships plain-text parsing + authoring; styled-text override codes (`{\b1}`, `{\i1}`, `{\c&HFFFFFF&}`) are stripped, mirroring v0.1's VTT inline-tag policy.
+
+### Problem
+
+ASS / SSA dominate fansub and anime release pipelines, and increasingly show up in streaming-platform deliverables (Crunchyroll, HIDIVE, Netflix anime). Apps that ingest community subtitles need this format. Surface for plain-text reading is small (~250 LOC); authoring is similar (~150 LOC). Together they finish the "common subtitle format" matrix.
+
+### Scope lock
+
+In scope:
+- **`Caption.load(ass:)`** + **`CaptionParser.parseASS(_:)`** — plain-text ASS parser. Reads the `[Events]` section's `Format:` line to discover column order, then emits one `Caption` per `Dialogue:` line. `\N` and `\n` (literal backslash-n) become `\n` line breaks. Style override blocks like `{\b1}bold{\b0}` and `{\c&HFFFFFF&}color` are stripped.
+- **`Caption.load(ssa:)`** + **`CaptionParser.parseSSA(_:)`** — SSA parser. Same logic as ASS — the differences are in the style block (which we don't surface) and the timestamp-precision claim (both use centiseconds in practice). Implementation reuses the ASS path; the public split is for clarity at the call site.
+- **`CaptionAuthor.writeASS(_:to:)`** + **`renderASS(_:)`** — minimal valid ASS document with default style.
+- **`CaptionAuthor.writeSSA(_:to:)`** + **`renderSSA(_:)`** — minimal valid SSA document.
+- **Auto-detect dispatch** — `Caption.load(_:)` extended to recognize `.ass` and `.ssa` (case-insensitive).
+- **Time helpers** — `parseASSTimestamp(_:)`, `formatASSTimestamp(_:)` for `H:MM:SS.cc` (centisecond precision).
+
+Out of scope (v0.4.x or rejected):
+- **Style override preservation** — `{\b1}`, `{\i1}`, `{\fn...}`, `{\c...}`, etc. preserved as styling. v0.4 strips; styled output flows through v0.3's `TextOverlay` bridge if anyone wants it (would justify a `parseStyledASS` parallel to `parseStyledVTT`). Defer.
+- **Karaoke timing tags** — `{\k50}`, `{\K50}`, `{\kf50}`, `{\ko50}` (per-syllable timing). Stripped to plain text in v0.4.
+- **`[V4+ Styles]` / `[V4 Styles]` block parsing** — style definitions ignored; the `Style` reference on each `Dialogue:` line isn't surfaced. Bridges to per-cue styling would land alongside the styled-ASS parser.
+- **Drawing commands** — `{\p1}...{\p0}` (vector graphics). Stripped.
+- **`Comment:` events** — treated as non-rendered (skipped on read; not emitted on write).
+- **Per-cue Layer / MarginL / MarginR / MarginV / Effect** — fields read off the format line are recognized but their values aren't surfaced on `Caption`. Recorded as forward-compat scaffolding only if styled bridge ships later.
+
+### API examples
+
+```swift
+import Kadr
+import KadrCaptions
+
+// Auto-detect
+let cues = try await Caption.load(subtitleURL)  // .srt / .vtt / .itt / .ass / .ssa
+
+// Explicit
+let cues = try await Caption.load(ass: assURL)
+
+// Author
+try await CaptionAuthor.writeASS(cues, to: outputASS)
+```
+
+### Public surface sketch
+
+```swift
+public extension Caption {
+    static func load(ass url: URL) async throws -> [Caption]
+    static func load(ssa url: URL) async throws -> [Caption]
+}
+
+public extension CaptionParser {
+    static func parseASS(_ content: String) throws -> [Caption]
+    static func parseSSA(_ content: String) throws -> [Caption]
+    static func parseASSTimestamp(_ raw: String) -> CMTime?
+    static func stripASSOverrides(_ text: String) -> String
+}
+
+public extension CaptionAuthor {
+    static func writeASS(_ captions: [Caption], to url: URL) async throws
+    static func writeSSA(_ captions: [Caption], to url: URL) async throws
+    static func renderASS(_ captions: [Caption]) -> String
+    static func renderSSA(_ captions: [Caption]) -> String
+    static func formatASSTimestamp(_ time: CMTime) -> String
+}
+```
+
+No new error cases; existing `CaptionParseError.malformedTimestamp(line:raw:)` covers bad time fields, `unrecognizedFormat` covers unknown extensions.
+
+### Engine notes
+
+- **Section detection.** Walk lines; a `[Header]` line opens a section. Within `[Events]`, the first `Format:` line declares the field order — typically `Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text`. We need only the indices for `Start`, `End`, and `Text`; everything else is consumed and discarded.
+- **CSV row split.** `Dialogue:` lines split on `,` *with a hard limit of N-1 commas*, where N is the field count. The trailing `Text` field can contain commas and must not be split. Standard ASS parsers do this; we replicate the rule.
+- **Override block scanner.** `{...}` runs anywhere in `Text` are stripped. `\N` / `\n` (literal) → `\n`. `\h` (non-breaking space) → space. Drawing-mode segments (`{\p1}...{\p0}`) emit nothing for the geometry data between them.
+- **Timestamp parsing.** ASS time is `H:MM:SS.cc` (`H` not zero-padded; centiseconds, not milliseconds). Convert to `CMTime` at timescale 1000 (`cs * 10` for the millisecond digits).
+- **Writer.** Emit a minimal `[Script Info]` (title + `ScriptType: v4.00+` for ASS, `v4.00` for SSA), an empty `[V4+ Styles]` / `[V4 Styles]` with a Default style row, and an `[Events]` block with our standard 10-field format. Dialogue text is escaped: `,` → `\,`, `\n` → `\N`, `\` → `\\`, `{` → `\{`, `}` → `\}`.
+
+### Tier breakdown
+
+- **Tier 1** — `parseASS` + `parseSSA` + `Caption.load(ass:)` + `Caption.load(ssa:)` + auto-detect. ~300 LOC + tests.
+- **Tier 2** — `writeASS` + `writeSSA` + render helpers. ~200 LOC + tests.
+- **Tier 3** — Release prep + ship as **v0.4.0**.
+
+### Test strategy
+
+- **Parser** — minimal valid ASS / SSA, multi-line via `\N` and `\n`, override codes stripped, CSV row split with comma in text, comments skipped, malformed timestamps throw, missing `[Events]` section yields empty array.
+- **Time** — round-trip H:MM:SS.cc, centisecond precision, padded values.
+- **Writer** — round-trip a `[Caption]` through render → parse, escape characters, comma-in-text handling.
+- **Auto-detect** — `.ass` / `.ssa` (case-insensitive) routes correctly.
+
+Target: ~30 new tests across the cycle. Suite: 155 → ~185.
+
+### Compatibility
+
+- Still requires kadr ≥ 0.9.2.
+- Pure additive — every v0.3 call site compiles unchanged.
+
+### Open questions (track in PRs, not blocking RFC merge)
+
+- **`Comment:` round-trip.** Skipped on read. Should the writer emit any of the original metadata? v0.4 says no — round-tripping a parsed cue produces only the dialogue. Revisit if anyone needs to preserve provenance.
+- **Frame-rate-aware timing.** SSA / ASS files don't carry a frame rate (broadcast-style timecodes don't apply); centisecond precision is enough. No drop-frame concerns.
+- **Multi-language scripts.** SSA / ASS support multiple `Style` definitions but only one events block; multi-language subtitle files are typically distributed as separate files per language. v0.4 doesn't surface style metadata.
+- **Karaoke timing.** Stripped in v0.4. A future styled-ASS surface could expose per-syllable timing as something kadr-ui could render — but that's a major scope expansion. Defer indefinitely.
