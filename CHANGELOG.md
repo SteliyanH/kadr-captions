@@ -4,6 +4,44 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-04-30
+
+iTunes Timed Text (.itt) parser and writer. Completes the "every common subtitle format" story (SRT + VTT + iTT). Pure additive — every v0.1 call site compiles unchanged.
+
+### Added
+
+- **`Caption.load(itt:)`** — async iTT file loader. UTF-8 only (per TTML spec).
+- **`CaptionParser.parseITT(_:)`** — pure synchronous string parser. `Foundation.XMLParser`-based; no third-party deps.
+- **`CaptionParser.parseITTTime(_:frameRate:)`** — pure helper covering `HH:MM:SS.mmm`, `HH:MM:SS:FF` (frame-count, approximated at the document's declared `ttp:frameRate` or 30 fps fallback), `1.5s`, `1500ms`, plain seconds.
+- **`CaptionAuthor.writeITT(_:to:)`** — async iTT file writer (UTF-8, LF, Apple-compatible header).
+- **`CaptionAuthor.renderITT(_:)`** — pure render to String.
+- **`CaptionAuthor.formatITTTimestamp(_:)`** — pure `HH:MM:SS.mmm` formatter.
+- **`CaptionAuthor.renderCueBody(_:)`** — escapes XML entities + converts newlines to `<br/>`.
+- **`CaptionAuthor.xmlEscape(_:)`** — five-entity XML escape (`&`, `<`, `>`, `"`, `'`).
+- **`CaptionParseError.malformedXML(localizedDescription:)`** — new error case for XML structural failures.
+
+### Changed
+
+- **`Caption.load(_:)`** auto-detect dispatch now recognizes `.itt` (case-insensitive) alongside `.srt` and `.vtt`.
+
+### Cue mapping
+
+- Each `<p>` inside `<body><div>` becomes one `Caption`.
+- `<br/>` between text runs becomes `\n`.
+- Inline `<span>` styling flattened to plain text. Styled output flows through the v0.3 `TextOverlay` bridge instead.
+- Multiple `<div>` blocks concatenate.
+- `tt:` prefix on `begin` / `end` attributes tolerated.
+- Frame-count timestamps approximated at the document's declared `ttp:frameRate` (with 30 fps fallback) — frame-accurate round-trip is a v0.4+ concern.
+
+### Tests
+
+- 35 new tests covering `parseITTTime` (clock / frame / suffix / plain forms), `parseITT` (minimal docs, `<br/>` line breaks, `<span>` flattening, multi-`<div>`, frame-rate detection, `tt:` prefix tolerance, malformed XML, malformed timestamps), file loaders, the writer + escape helpers, and round-trips through disk. Suite: 63 → 98.
+
+### Notes
+
+- Styled / animated captions (mapping onto kadr v0.8 `TextOverlay` + `textAnimation`) remain deferred to v0.3.0+.
+- Frame-rate-aware timing is approximated, not surfaced on `Caption`. Real broadcast iTT files declare drop-frame `frameRate="29.97"`; revisit in a follow-up if accuracy matters.
+
 ## [0.1.0] - 2026-04-30
 
 The first release. Parses and writes SubRip (.srt) and WebVTT (.vtt) caption files into kadr's `Caption` value type. Adapter package consuming kadr v0.9.2's caption surface — kadr core ships only the AVFoundation bridge; this package handles the file-format ecosystem.

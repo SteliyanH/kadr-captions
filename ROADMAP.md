@@ -19,12 +19,14 @@ The first release. Parses and writes SubRip (.srt) and WebVTT (.vtt) caption fil
 
 Depends on **kadr v0.9.2** (uses `Caption` value type + `Video.captions(_:)`).
 
-## v0.2.0 — iTT *(planned)*
+## v0.2.0 — iTT ✓ shipped
 
-iTunes Timed Text (.itt) parser and writer. Verbose XML; larger surface than SRT/VTT.
+iTunes Timed Text (.itt) parser and writer. `Foundation.XMLParser`-based; no third-party deps. Plain-text Caption mapping (styled regions / spans flattened); the v0.3 `TextOverlay` bridge handles the visual side.
 
-- `Caption.load(itt: URL) async throws -> [Caption]`
-- `CaptionAuthor.writeITT(_:to:) async throws`
+- `Caption.load(itt:)` + `CaptionParser.parseITT(_:)` + `parseITTTime(_:frameRate:)`
+- `CaptionAuthor.writeITT(_:to:)` + `renderITT(_:)` + `formatITTTimestamp(_:)`
+- `Caption.load(_:)` auto-detect extended for `.itt`
+- New `CaptionParseError.malformedXML(localizedDescription:)`
 
 ## v0.3.0+ — Styled / animated captions *(planned)*
 
@@ -35,7 +37,8 @@ Bridges a styled VTT cue (or programmatic builder) onto kadr v0.8's `TextOverlay
 | KadrCaptions | Requires Kadr |
 |---|---|
 | 0.1.0 | ≥ 0.9.2 |
-| 0.2.0+ *(planned)* | ≥ 0.9.2 |
+| 0.2.0 | ≥ 0.9.2 |
+| 0.3.0+ *(planned)* | ≥ 0.9.2 |
 
 ## Contributing
 
