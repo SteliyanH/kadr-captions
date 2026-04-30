@@ -35,9 +35,13 @@ try await CaptionAuthor.writeVTT(cues, to: outputVTT)
 |---|---|
 | `Caption.load(_ url:)` | Auto-detect by extension; dispatches to `load(srt:)` / `load(vtt:)` / `load(itt:)` |
 | `Caption.load(srt:)` / `load(vtt:)` / `load(itt:)` | Async file loaders; SRT loader has UTF-8 + Windows-1252 fallback |
+| `Caption.loadStyled(vtt:)` *(v0.3)* | Async loader producing `StyledCaption` (preserves cue settings + inline tags) |
 | `CaptionParser.parseSRT(_:)` / `parseVTT(_:)` / `parseITT(_:)` | Pure synchronous string parsers |
+| `CaptionParser.parseStyledVTT(_:)` *(v0.3)* | Styled VTT parser — preserves alignment / line / position / bold / italic / speaker / classes |
 | `CaptionAuthor.writeSRT(_:to:)` / `writeVTT(_:to:)` / `writeITT(_:to:)` | Async writers (UTF-8, LF) |
 | `CaptionAuthor.renderSRT(_:)` / `renderVTT(_:)` / `renderITT(_:)` | Pure render helpers (string form) |
+| `StyledCaption.toTextOverlay(baseStyle:animation:)` *(v0.3)* | Bridge to `Kadr.TextOverlay` for burned-in styled captions |
+| `Video.styledCaptions(_:baseStyle:animation:)` *(v0.3)* | Overlay every styled cue with per-cue visibility |
 | `CaptionParseError` | Typed errors with source-line metadata |
 
 ## Why a separate package?
