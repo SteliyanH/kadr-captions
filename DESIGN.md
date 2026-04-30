@@ -133,3 +133,105 @@ Target coverage: ~30 tests across the cycle.
 - **VTT cue identifiers.** WebVTT lets a cue have a string ID before its timestamp line. v0.1 ignores it. Revisit if the styled-caption builder needs them.
 - **Numeric SRT cue index — strict or lenient?** Some real-world SRT files have non-sequential or missing indices. Lenient default: parse the timestamp line directly without requiring a numeric index. Decision: lenient.
 - **Error position metadata.** Errors carry `line: Int` so callers can surface "line 42: bad timestamp." Costs minimal storage; worth it for debug ergonomics.
+
+## v0.2.0 design — iTT (iTunes Timed Text)
+
+Adds the third common caption format. iTT is Apple's flavor of TTML 1.0 (XML-based), used by Final Cut Pro, iTunes / Apple TV submission, and DVD-Video authoring tools. Verbose XML, but the surface that maps cleanly to v0.1's plain-text `Caption` is small.
+
+### Problem
+
+iTT files in the wild range from "minimal head + body cue list" (~2× the SRT size for the same content) to "full TTML with regions, styles, layout, namespaces" (~10×). The full TTML 1.0 spec is enormous; v0.2 covers what consuming apps actually receive — Final Cut export, iTunes preview, broadcast deliverables.
+
+### Scope lock
+
+In scope:
+- **iTT parser** — `Caption.load(itt:)` async file loader + `CaptionParser.parseITT(_:)` pure string parser. Produces plain-text `Caption` values: each `<p>` element inside `<body><div>` becomes one cue. Inline `<span>` styling is flattened to plain text (same as VTT inline tags in v0.1). `<br/>` becomes `\n`. Multiple `<div>` blocks concatenate.
+- **iTT writer** — `CaptionAuthor.writeITT(_:to:)` + `renderITT(_:)`. Emits a minimal valid iTT document with `xmlns="http://www.w3.org/ns/ttml"` and `xmlns:tt="http://www.w3.org/ns/ttml"`. UTF-8, LF, with the standard Apple `frameRate="30" tickRate="1000"` header.
+- **Auto-detect dispatch** — extend `Caption.load(_:)` to recognize `.itt` (case-insensitive) → `load(itt:)`.
+- **Time format** — `HH:MM:SS.mmm` (TTML clock-time), with `HH:MM:SS:FF` (frame-count) tolerated on read by approximating `FF / 30` since v0.2 doesn't surface frame rate in `Caption`.
+- **Error path** — XML parsing failures throw `CaptionParseError.malformedTimestamp(line:raw:)` for unparseable `begin` / `end` attributes; structurally invalid XML throws a new `.malformedXML(localizedDescription:)`.
+
+Out of scope (deferred to v0.4 styled bridge or rejected):
+- **Region / style preservation** — iTT styled regions are dropped on read (mapped to plain text), same v0.3 promise as VTT. Styled output flows through the v0.3 `TextOverlay` bridge once that ships.
+- **Frame-rate-aware timing** — iTT supports `tickRate` / `frameRate` / drop-frame attributes. Honored on read (approximation at the document's declared `frameRate`, or fallback 30 fps), but not surfaced on `Caption` since the type is plain time + text. Frame-accurate round-trip is a v0.4+ concern.
+- **TTML namespace inheritance / nested `tt:`-prefixed attributes** — accepted but ignored. The parser reads `begin` / `end` whether or not they carry a `tt:` prefix.
+- **Deeper TTML 1.0 compliance** (animations, `<set>`, multiple language tracks in one file). Out of scope; would justify its own package.
+
+### API examples
+
+```swift
+import Kadr
+import KadrCaptions
+
+// Auto-detect
+let cues = try await Caption.load(subtitleURL)  // .srt / .vtt / .itt all work
+
+// Explicit
+let cues = try await Caption.load(itt: ittURL)
+
+// Author
+try await CaptionAuthor.writeITT(cues, to: outputITT)
+
+// String form
+let raw = try String(contentsOf: bundleURL)
+let parsed = try CaptionParser.parseITT(raw)
+```
+
+### Public surface sketch
+
+```swift
+public extension Caption {
+    /// Parse an iTunes Timed Text (.itt) file from a URL.
+    static func load(itt url: URL) async throws -> [Caption]
+}
+
+public extension CaptionParser {
+    /// Parse iTT content from a pre-loaded string. Cue text is flattened to plain text;
+    /// styled output flows through the v0.3 TextOverlay bridge instead.
+    static func parseITT(_ content: String) throws -> [Caption]
+}
+
+public extension CaptionAuthor {
+    /// Write captions to disk as iTT. UTF-8, LF, Apple-compatible header.
+    static func writeITT(_ captions: [Caption], to url: URL) async throws
+    /// Render iTT body for a list of captions. Pure.
+    static func renderITT(_ captions: [Caption]) -> String
+}
+
+public extension CaptionParseError {
+    /// XML parsing failed. The `Foundation.XMLParser` `parserError`'s description
+    /// is preserved for debugging.
+    case malformedXML(localizedDescription: String)
+}
+```
+
+### Engine notes
+
+- **Parser implementation.** `Foundation.XMLParser` (NSXMLParserDelegate-style) is small, fast, and dependency-free. We track a tiny state machine: in-`<body>` / in-`<div>` / in-`<p>` / collecting text. `<br/>` triggers a `"\n"` insert; closing `</p>` finalizes a cue.
+- **Time-attribute parsing.** Strip `s` / `ms` suffixes (TTML allows `1.5s`, `1500ms` forms — rare in iTT but seen). Frame-count form `HH:MM:SS:FF` is parsed as `HH*3600 + MM*60 + SS + FF/30` (approximation; documented limitation).
+- **Writer XML escaping.** Standard 5: `&`, `<`, `>`, `"`, `'`. iTT consumers tolerate `&apos;` / `&quot;`; we emit them.
+
+### Tier breakdown
+
+- **Tier 1** — `parseITT(_:)` + `Caption.load(itt:)` + `Caption.load(_:)` extension to dispatch on `.itt`. Tests for header detection, well-formed multi-cue files, malformed XML, brittle real-world FCP-export shapes, time-attribute variants. ~250 LOC + tests.
+- **Tier 2** — `writeITT(_:to:)` + `renderITT(_:)`. Round-trip tests through disk. ~150 LOC + tests.
+- **Tier 3** — Release prep + ship as **v0.2.0**. CHANGELOG, README polish, develop → main.
+
+### Test strategy
+
+- **Parser** — well-formed FCP-export shape, missing `xmlns`, `<br/>` line breaks, nested `<span>` flattening, drop-frame `HH:MM:SS:FF` timestamps approximated, `1.5s` / `1500ms` time attributes, multi-`<div>` concatenation, malformed XML throws.
+- **Writer** — round-trip a known `[Caption]`; verify the produced XML re-parses to the same cues; XML escaping for special characters; UTF-8 declaration; Apple-compatible header attributes.
+- **Auto-detect** — `.itt` (case-insensitive) routes to `load(itt:)`.
+
+Target test count: ~25.
+
+### Compatibility
+
+- KadrCaptions 0.2.0 still requires kadr ≥ 0.9.2.
+- Pure additive — every v0.1 call site compiles unchanged.
+
+### Open questions (track in PRs, not blocking RFC merge)
+
+- **Frame-rate handling.** v0.2 approximates frame counts at 30 fps. Real broadcast iTT files declare `frameRate="29.97"` with drop-frame; revisit if anyone hits inaccuracy.
+- **Multiple `<body>` languages.** TTML allows multiple `<body>` blocks with different `xml:lang`. v0.2 reads only the first; a v0.4+ multi-language Caption surface would expose all.
+- **Element name case.** TTML is XML — case-sensitive. v0.2 expects lowercase `body` / `div` / `p` / `span` / `br`. FCP and iTunes both emit lowercase; revisit if a producer ships uppercase.
