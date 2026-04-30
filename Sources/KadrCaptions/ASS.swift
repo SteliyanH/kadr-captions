@@ -208,6 +208,105 @@ extension Caption {
     }
 }
 
+// MARK: - Writer
+
+extension CaptionAuthor {
+
+    /// Write captions to disk as ASS (.ass). UTF-8, LF line endings, minimal valid
+    /// `[Script Info]` + `[V4+ Styles]` + `[Events]` blocks. Existing file at `url`
+    /// is overwritten.
+    public static func writeASS(_ captions: [Caption], to url: URL) async throws {
+        let content = renderASS(captions)
+        do {
+            try content.data(using: .utf8)?.write(to: url, options: .atomic)
+        } catch {
+            throw CaptionParseError.unreadableFile(url)
+        }
+    }
+
+    /// Write captions to disk as SSA (.ssa). UTF-8, LF, minimal valid
+    /// `[Script Info]` + `[V4 Styles]` + `[Events]` blocks.
+    public static func writeSSA(_ captions: [Caption], to url: URL) async throws {
+        let content = renderSSA(captions)
+        do {
+            try content.data(using: .utf8)?.write(to: url, options: .atomic)
+        } catch {
+            throw CaptionParseError.unreadableFile(url)
+        }
+    }
+
+    /// Render a minimal valid ASS document for the given captions. Pure — exposed
+    /// for tests and for callers wanting the string form.
+    public static func renderASS(_ captions: [Caption]) -> String {
+        var out = ""
+        out += "[Script Info]\n"
+        out += "Title: KadrCaptions Output\n"
+        out += "ScriptType: v4.00+\n"
+        out += "\n"
+        out += "[V4+ Styles]\n"
+        out += "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        out += "Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n"
+        out += "\n"
+        out += "[Events]\n"
+        out += "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        for cue in captions {
+            let start = formatASSTimestamp(cue.timeRange.start)
+            let end = formatASSTimestamp(CMTimeAdd(cue.timeRange.start, cue.timeRange.duration))
+            let text = renderASSCueText(cue.text)
+            out += "Dialogue: 0,\(start),\(end),Default,,0,0,0,,\(text)\n"
+        }
+        return out
+    }
+
+    /// Render a minimal valid SSA document. Differs from ``renderASS(_:)`` by using
+    /// the v4.00 (no `+`) script-type marker and `[V4 Styles]` block. Pure.
+    public static func renderSSA(_ captions: [Caption]) -> String {
+        var out = ""
+        out += "[Script Info]\n"
+        out += "Title: KadrCaptions Output\n"
+        out += "ScriptType: v4.00\n"
+        out += "\n"
+        out += "[V4 Styles]\n"
+        out += "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, TertiaryColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, AlphaLevel, Encoding\n"
+        out += "Style: Default,Arial,20,16777215,255,16777215,0,0,0,1,2,0,2,10,10,10,0,1\n"
+        out += "\n"
+        out += "[Events]\n"
+        out += "Format: Marked, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        for cue in captions {
+            let start = formatASSTimestamp(cue.timeRange.start)
+            let end = formatASSTimestamp(CMTimeAdd(cue.timeRange.start, cue.timeRange.duration))
+            let text = renderASSCueText(cue.text)
+            out += "Dialogue: Marked=0,\(start),\(end),Default,,0,0,0,,\(text)\n"
+        }
+        return out
+    }
+
+    /// Format a `CMTime` as an ASS / SSA timestamp `H:MM:SS.cc` (centisecond
+    /// precision; hour digit not zero-padded). Pure — exposed for tests.
+    public static func formatASSTimestamp(_ time: CMTime) -> String {
+        let totalCs = Int((CMTimeGetSeconds(time) * 100.0).rounded())
+        let cs = max(0, totalCs % 100)
+        let totalSec = max(0, totalCs / 100)
+        let s = totalSec % 60
+        let totalMin = totalSec / 60
+        let m = totalMin % 60
+        let h = totalMin / 60
+        return String(format: "%d:%02d:%02d.%02d", h, m, s, cs)
+    }
+
+    /// Convert a cue text into ASS-renderable form. `\n` line breaks become `\N`
+    /// (the ASS line-break escape). Other characters pass through unchanged.
+    /// Pure — exposed for tests.
+    ///
+    /// **Limitation.** Literal `{` / `}` characters in cue text round-trip
+    /// incorrectly because the parser treats them as override-block markers. Plain
+    /// punctuation is fine; if your cues contain SQL-style braces or template
+    /// markers, encode them ahead of time.
+    public static func renderASSCueText(_ text: String) -> String {
+        text.replacingOccurrences(of: "\n", with: "\\N")
+    }
+}
+
 // MARK: - String helpers
 
 extension String {
