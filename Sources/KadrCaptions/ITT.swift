@@ -109,6 +109,81 @@ extension Caption {
     }
 }
 
+// MARK: - Writer
+
+extension CaptionAuthor {
+
+    /// Write captions to disk as iTT (.itt). UTF-8, LF line endings, Apple-compatible
+    /// `frameRate="30" tickRate="1000"` header. Existing file at `url` is overwritten.
+    public static func writeITT(_ captions: [Caption], to url: URL) async throws {
+        let content = renderITT(captions)
+        do {
+            try content.data(using: .utf8)?.write(to: url, options: .atomic)
+        } catch {
+            throw CaptionParseError.unreadableFile(url)
+        }
+    }
+
+    /// Render an iTT document body for a list of captions. Pure — exposed for tests
+    /// and for callers wanting the string form (e.g. to send over the wire instead
+    /// of writing to disk).
+    public static func renderITT(_ captions: [Caption]) -> String {
+        var out = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        out += "<tt xmlns=\"http://www.w3.org/ns/ttml\" "
+        out += "xmlns:ttp=\"http://www.w3.org/ns/ttml#parameter\" "
+        out += "ttp:frameRate=\"30\" ttp:tickRate=\"1000\">\n"
+        out += "  <body>\n"
+        out += "    <div>\n"
+        for cue in captions {
+            let begin = formatITTTimestamp(cue.timeRange.start)
+            let end = formatITTTimestamp(CMTimeAdd(cue.timeRange.start, cue.timeRange.duration))
+            let body = renderCueBody(cue.text)
+            out += "      <p begin=\"\(begin)\" end=\"\(end)\">\(body)</p>\n"
+        }
+        out += "    </div>\n"
+        out += "  </body>\n"
+        out += "</tt>\n"
+        return out
+    }
+
+    /// Format a `CMTime` as a TTML clock-time `HH:MM:SS.mmm`. Pure — exposed for
+    /// tests.
+    public static func formatITTTimestamp(_ time: CMTime) -> String {
+        let totalMs = Int((CMTimeGetSeconds(time) * 1000.0).rounded())
+        let ms = totalMs % 1000
+        let totalSec = totalMs / 1000
+        let s = totalSec % 60
+        let totalMin = totalSec / 60
+        let m = totalMin % 60
+        let h = totalMin / 60
+        return String(format: "%02d:%02d:%02d.%03d", h, m, s, ms)
+    }
+
+    /// XML-escape the cue text and convert embedded newlines to `<br/>`. Pure helper —
+    /// exposed for tests.
+    public static func renderCueBody(_ text: String) -> String {
+        let escaped = xmlEscape(text)
+        return escaped.replacingOccurrences(of: "\n", with: "<br/>")
+    }
+
+    /// Escape the standard five XML entities. Pure — exposed for tests.
+    public static func xmlEscape(_ text: String) -> String {
+        var out = ""
+        out.reserveCapacity(text.count)
+        for ch in text {
+            switch ch {
+            case "&":  out += "&amp;"
+            case "<":  out += "&lt;"
+            case ">":  out += "&gt;"
+            case "\"": out += "&quot;"
+            case "'":  out += "&apos;"
+            default:   out.append(ch)
+            }
+        }
+        return out
+    }
+}
+
 // MARK: - XMLParserDelegate
 
 private final class ITTParserDelegate: NSObject, XMLParserDelegate {

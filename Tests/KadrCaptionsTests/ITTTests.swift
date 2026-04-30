@@ -220,4 +220,117 @@ struct ITTTests {
         let cues = try await Caption.load(tmp)
         #expect(cues.count == 2)
     }
+
+    // MARK: - Writer helpers
+
+    private func cmt(_ seconds: Double) -> CMTime {
+        CMTime(seconds: seconds, preferredTimescale: 1000)
+    }
+
+    @Test func formatsITTTimestamp() {
+        #expect(CaptionAuthor.formatITTTimestamp(cmt(0)) == "00:00:00.000")
+        #expect(CaptionAuthor.formatITTTimestamp(cmt(83.456)) == "00:01:23.456")
+        #expect(CaptionAuthor.formatITTTimestamp(cmt(3725.5)) == "01:02:05.500")
+    }
+
+    @Test func xmlEscapeHandlesAllFiveEntities() {
+        #expect(CaptionAuthor.xmlEscape("a & b < c > d \"e\" 'f'")
+            == "a &amp; b &lt; c &gt; d &quot;e&quot; &apos;f&apos;")
+    }
+
+    @Test func xmlEscapeLeavesPlainTextUntouched() {
+        #expect(CaptionAuthor.xmlEscape("hello world") == "hello world")
+    }
+
+    @Test func renderCueBodyConvertsNewlinesToBr() {
+        #expect(CaptionAuthor.renderCueBody("Line one\nLine two") == "Line one<br/>Line two")
+    }
+
+    @Test func renderCueBodyEscapesAndConverts() {
+        #expect(CaptionAuthor.renderCueBody("a < b\nc & d") == "a &lt; b<br/>c &amp; d")
+    }
+
+    // MARK: - renderITT
+
+    @Test func renderITTHasXMLDeclarationAndHeader() {
+        let cues = [Caption(text: "Hello", timeRange: CMTimeRange(start: cmt(0), duration: cmt(2)))]
+        let out = CaptionAuthor.renderITT(cues)
+        #expect(out.hasPrefix("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"))
+        #expect(out.contains("xmlns=\"http://www.w3.org/ns/ttml\""))
+        #expect(out.contains("ttp:frameRate=\"30\""))
+        #expect(out.contains("ttp:tickRate=\"1000\""))
+    }
+
+    @Test func renderITTEmitsOnePElementPerCue() {
+        let cues = [
+            Caption(text: "First", timeRange: CMTimeRange(start: cmt(0), duration: cmt(2))),
+            Caption(text: "Second", timeRange: CMTimeRange(start: cmt(2), duration: cmt(3))),
+        ]
+        let out = CaptionAuthor.renderITT(cues)
+        #expect(out.contains("<p begin=\"00:00:00.000\" end=\"00:00:02.000\">First</p>"))
+        #expect(out.contains("<p begin=\"00:00:02.000\" end=\"00:00:05.000\">Second</p>"))
+    }
+
+    @Test func renderITTEscapesSpecialCharacters() {
+        let cues = [Caption(text: "a & b < c", timeRange: CMTimeRange(start: cmt(0), duration: cmt(1)))]
+        let out = CaptionAuthor.renderITT(cues)
+        #expect(out.contains("a &amp; b &lt; c"))
+    }
+
+    @Test func renderITTConvertsNewlinesToBr() {
+        let cues = [Caption(text: "Line one\nLine two", timeRange: CMTimeRange(start: cmt(0), duration: cmt(1)))]
+        let out = CaptionAuthor.renderITT(cues)
+        #expect(out.contains("Line one<br/>Line two"))
+    }
+
+    // MARK: - Round-trip
+
+    @Test func roundTripPreservesPlainCaptions() {
+        let cues = [
+            Caption(text: "Hello", timeRange: CMTimeRange(start: cmt(0), duration: cmt(2))),
+            Caption(text: "World", timeRange: CMTimeRange(start: cmt(2), duration: cmt(3))),
+        ]
+        let rendered = CaptionAuthor.renderITT(cues)
+        let reparsed = try! CaptionParser.parseITT(rendered)
+        #expect(reparsed.count == cues.count)
+        for (a, b) in zip(cues, reparsed) {
+            #expect(a.text == b.text)
+            #expect(abs(CMTimeGetSeconds(a.timeRange.start) - CMTimeGetSeconds(b.timeRange.start)) < 0.001)
+            #expect(abs(CMTimeGetSeconds(a.timeRange.duration) - CMTimeGetSeconds(b.timeRange.duration)) < 0.001)
+        }
+    }
+
+    @Test func roundTripPreservesMultilineCaptions() {
+        let cues = [
+            Caption(text: "First\nSecond\nThird", timeRange: CMTimeRange(start: cmt(0), duration: cmt(3))),
+        ]
+        let rendered = CaptionAuthor.renderITT(cues)
+        let reparsed = try! CaptionParser.parseITT(rendered)
+        #expect(reparsed.count == 1)
+        #expect(reparsed[0].text == "First\nSecond\nThird")
+    }
+
+    @Test func roundTripPreservesSpecialCharacters() {
+        let cues = [
+            Caption(text: "a & b < c > d", timeRange: CMTimeRange(start: cmt(0), duration: cmt(2))),
+        ]
+        let rendered = CaptionAuthor.renderITT(cues)
+        let reparsed = try! CaptionParser.parseITT(rendered)
+        #expect(reparsed.count == 1)
+        #expect(reparsed[0].text == "a & b < c > d")
+    }
+
+    @Test func writerRoundTripsThroughDisk() async throws {
+        let cues = [
+            Caption(text: "Round", timeRange: CMTimeRange(start: cmt(0), duration: cmt(1))),
+            Caption(text: "Trip", timeRange: CMTimeRange(start: cmt(1), duration: cmt(2))),
+        ]
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString + ".itt")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try await CaptionAuthor.writeITT(cues, to: tmp)
+        let reparsed = try await Caption.load(itt: tmp)
+        #expect(reparsed.count == 2)
+        #expect(reparsed.map(\.text) == ["Round", "Trip"])
+    }
 }
