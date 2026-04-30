@@ -28,9 +28,18 @@ iTunes Timed Text (.itt) parser and writer. `Foundation.XMLParser`-based; no thi
 - `Caption.load(_:)` auto-detect extended for `.itt`
 - New `CaptionParseError.malformedXML(localizedDescription:)`
 
-## v0.3.0+ — Styled / animated captions *(planned)*
+## v0.3.0 — Styled captions → TextOverlay ✓ shipped
 
-Bridges a styled VTT cue (or programmatic builder) onto kadr v0.8's `TextOverlay` + `textAnimation`. Lets consumers ingest a styled caption file and render it as an animated overlay rather than a plain metadata cue. Surface design TBD; depends on real consumer use cases.
+Bridges a styled VTT cue (or programmatic builder) onto kadr v0.8's `TextOverlay` + `textAnimation`. Consumers ingest a styled caption file and render it as a styled / animated overlay burned into the export.
+
+- `StyledCaption` value type + `StyledCaptionAlignment` / `StyledCaptionLine` enums
+- `CaptionParser.parseStyledVTT(_:)` + `Caption.loadStyled(vtt:)`
+- `StyledCaption.toTextOverlay(baseStyle:animation:)` bridge
+- `Video.styledCaptions(_:baseStyle:animation:)` convenience modifier
+
+## v0.4.0 — ASS / SSA *(planned)*
+
+Advanced SubStation Alpha — used heavily in anime / fansub pipelines. Adds the fourth and final common caption format.
 
 ## Compatibility track record
 
@@ -38,7 +47,8 @@ Bridges a styled VTT cue (or programmatic builder) onto kadr v0.8's `TextOverlay
 |---|---|
 | 0.1.0 | ≥ 0.9.2 |
 | 0.2.0 | ≥ 0.9.2 |
-| 0.3.0+ *(planned)* | ≥ 0.9.2 |
+| 0.3.0 | ≥ 0.9.2 |
+| 0.4.0+ *(planned)* | ≥ 0.9.2 |
 
 ## Contributing
 
