@@ -4,6 +4,42 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-04-30
+
+ASS / SSA support. Adds the fourth and final caption format — Advanced SubStation Alpha (.ass) and SubStation Alpha (.ssa). Heavily used in anime / fansub / streaming pipelines. **Completes the "every common subtitle format" matrix:** SRT + VTT + iTT + ASS + SSA. Pure additive — every v0.3 call site compiles unchanged.
+
+### Added
+
+- **`Caption.load(ass:)`** + **`CaptionParser.parseASS(_:)`** — async file loader + pure synchronous string parser for Advanced SubStation Alpha.
+- **`Caption.load(ssa:)`** + **`CaptionParser.parseSSA(_:)`** — same for SubStation Alpha.
+- **`CaptionAuthor.writeASS(_:to:)`** + **`writeSSA(_:to:)`** — async writers.
+- **`CaptionAuthor.renderASS(_:)`** + **`renderSSA(_:)`** — pure render helpers (string form).
+- Pure timestamp / formatting helpers: `parseASSTimestamp`, `formatASSTimestamp`, `splitASSDialogue`, `stripASSOverrides`, `renderASSCueText`.
+
+### Changed
+
+- **`Caption.load(_:)`** auto-detect dispatch now recognizes `.ass` and `.ssa` (case-insensitive) alongside `.srt` / `.vtt` / `.itt`.
+
+### Behavior
+
+- Reads `[Events]` `Format:` line for column ordering — finds Start / End / Text indices.
+- `Comment:` events skipped silently; `;` and `!:` comment lines also skipped.
+- CSV row split preserves commas in the trailing Text field (splits on first `N - 1` commas).
+- Style override blocks (`{\b1}`, `{\c&HFFFFFF&}`, etc.) and karaoke timing tags (`{\k50}`) stripped — styled output flows through v0.3's `TextOverlay` bridge if anyone wants it.
+- `\N` / `\n` line breaks → `\n`; `\h` (hard space) → space.
+- Reverse-range cues (end < start) silently dropped.
+- ASS timestamps parsed as `H:MM:SS.cc` (centisecond precision; hour digit not zero-padded).
+- Writer emits `ScriptType: v4.00+` for ASS / `v4.00` for SSA, with format-appropriate `[V4+ Styles]` / `[V4 Styles]` blocks and a single Default style row.
+
+### Tests
+
+- 45 new tests across `ASSTests` covering timestamp parsing (clock / padded / unpadded / invalid), CSV row split (commas in text, malformed counts), override stripping (bold / color / karaoke / `\N` / `\n` / `\h` / nested), full-document parsing (multi-line, comments, missing-Events, reverse ranges), file loaders, auto-detect dispatch (case-sensitive + case-insensitive), writer + render helpers, and round-trips through disk for both formats. Suite: 155 → 200.
+
+### Notes
+
+- Style preservation, karaoke timing tags, drawing commands, `Comment:` round-trip, and `[V4+ Styles]` block parsing are all out of scope. The styled-ASS surface is the next forward edge if anyone needs it.
+- **Documented limitation:** literal `{` / `}` characters in cue text don't round-trip — the parser treats them as override-block markers.
+
 ## [0.3.0] - 2026-04-30
 
 Styled captions → `Kadr.TextOverlay` bridge. The biggest leap of the cycle: a parser path that **preserves** VTT cue settings and inline styling, plus a bridge that maps a styled cue onto kadr v0.8's `TextOverlay` + `textAnimation`. Consumers can now render captions as styled, animated overlays burned into the export — not just `AVMetadataItem` cues for the OS picker.

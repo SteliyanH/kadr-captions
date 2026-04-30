@@ -37,9 +37,14 @@ Bridges a styled VTT cue (or programmatic builder) onto kadr v0.8's `TextOverlay
 - `StyledCaption.toTextOverlay(baseStyle:animation:)` bridge
 - `Video.styledCaptions(_:baseStyle:animation:)` convenience modifier
 
-## v0.4.0 — ASS / SSA *(planned)*
+## v0.4.0 — ASS / SSA ✓ shipped
 
-Advanced SubStation Alpha — used heavily in anime / fansub pipelines. Adds the fourth and final common caption format.
+Advanced SubStation Alpha (.ass) and SubStation Alpha (.ssa). Plain-text Caption mapping (style overrides + karaoke tags stripped); the v0.3 `TextOverlay` bridge handles the visual side if needed. **Completes the every-common-format matrix.**
+
+- `CaptionParser.parseASS(_:)` / `parseSSA(_:)` + `Caption.load(ass:)` / `load(ssa:)`
+- `CaptionAuthor.writeASS(_:to:)` / `writeSSA(_:to:)` + `renderASS(_:)` / `renderSSA(_:)`
+- Pure helpers: `parseASSTimestamp`, `formatASSTimestamp`, `splitASSDialogue`, `stripASSOverrides`
+- `Caption.load(_:)` auto-detect extended for `.ass` / `.ssa`
 
 ## Compatibility track record
 
@@ -48,7 +53,7 @@ Advanced SubStation Alpha — used heavily in anime / fansub pipelines. Adds the
 | 0.1.0 | ≥ 0.9.2 |
 | 0.2.0 | ≥ 0.9.2 |
 | 0.3.0 | ≥ 0.9.2 |
-| 0.4.0+ *(planned)* | ≥ 0.9.2 |
+| 0.4.0 | ≥ 0.9.2 |
 
 ## Contributing
 
