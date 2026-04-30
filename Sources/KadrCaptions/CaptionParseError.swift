@@ -26,4 +26,8 @@ public enum CaptionParseError: Error, Equatable {
     /// File contents couldn't be decoded as either UTF-8 or Windows-1252 (the legacy
     /// SRT fallback). Surfaced when both attempts fail.
     case unsupportedEncoding(URL)
+
+    /// XML parsing failed (iTT). The underlying `Foundation.XMLParser` error
+    /// description is preserved for debugging. Added in v0.2.
+    case malformedXML(localizedDescription: String)
 }
