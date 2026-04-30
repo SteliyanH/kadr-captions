@@ -35,19 +35,19 @@ struct CaptionLoadTests {
     }
 
     @Test func unrecognizedExtensionThrows() async throws {
-        let url = URL(fileURLWithPath: "/tmp/captions.ass")
+        let url = URL(fileURLWithPath: "/tmp/captions.scc")
         await #expect(throws: CaptionParseError.self) {
             try await Caption.load(url)
         }
     }
 
     @Test func unrecognizedExtensionCarriesExtensionInError() async throws {
-        let url = URL(fileURLWithPath: "/tmp/captions.ass")
+        let url = URL(fileURLWithPath: "/tmp/captions.scc")
         do {
             _ = try await Caption.load(url)
             Issue.record("expected throw")
         } catch let CaptionParseError.unrecognizedFormat(ext) {
-            #expect(ext == "ass")
+            #expect(ext == "scc")
         } catch {
             Issue.record("expected unrecognizedFormat, got \(error)")
         }
