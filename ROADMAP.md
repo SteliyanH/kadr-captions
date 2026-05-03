@@ -46,6 +46,16 @@ Advanced SubStation Alpha (.ass) and SubStation Alpha (.ssa). Plain-text Caption
 - Pure helpers: `parseASSTimestamp`, `formatASSTimestamp`, `splitASSDialogue`, `stripASSOverrides`
 - `Caption.load(_:)` auto-detect extended for `.ass` / `.ssa`
 
+## v0.5.0 — Styled ASS / SSA + time utilities ✓ shipped
+
+Closes the high-value gaps from a final feature audit. Pure additive — every v0.4 call site compiles unchanged.
+
+- **`Caption.shifted(by:)` / `Caption.scaled(by:)`** — pure value-type transforms for syncing cues to a re-encoded / sped-up video. Array sugar mirrors both.
+- **`CaptionParser.parseStyledASS(_:)` / `parseStyledSSA(_:)`** + **`Caption.loadStyled(ass:)` / `loadStyled(ssa:)`** — round-trip color, bold / italic / underline, and alignment (`\an<N>` numpad + legacy `\a<N>` SSA bitmask) into `[StyledCaption]`. ASS alpha flipped on import.
+- **`StyledCaption.color: String?`** — hex-form color field with `nil` default; bridge applies via the new `StyledCaption.platformColor(forHex:)` helper. Karaoke tags / `\pos(...)` / font / size overrides remain stripped (TextStyle can't render them).
+
+Cycle considered feature-complete pending kadr v1.0.
+
 ## Compatibility track record
 
 | KadrCaptions | Requires Kadr |
@@ -54,6 +64,7 @@ Advanced SubStation Alpha (.ass) and SubStation Alpha (.ssa). Plain-text Caption
 | 0.2.0 | ≥ 0.9.2 |
 | 0.3.0 | ≥ 0.9.2 |
 | 0.4.0 | ≥ 0.9.2 |
+| 0.5.0 | ≥ 0.9.2 |
 
 ## Contributing
 
