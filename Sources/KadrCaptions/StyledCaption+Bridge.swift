@@ -1,6 +1,11 @@
 import Foundation
 import CoreMedia
 import Kadr
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 extension StyledCaption {
 
@@ -19,7 +24,10 @@ extension StyledCaption {
         baseStyle: TextStyle = .default,
         animation: (any TextAnimation)? = nil
     ) -> TextOverlay {
-        let style = StyledCaption.applyStyling(base: baseStyle, isBold: isBold, isItalic: isItalic, alignment: alignment)
+        var style = StyledCaption.applyStyling(base: baseStyle, isBold: isBold, isItalic: isItalic, alignment: alignment)
+        if let color, let parsed = StyledCaption.platformColor(forHex: color) {
+            style.color = parsed
+        }
         let position = StyledCaption.overlayPosition(line: line, position: self.position)
         let anchor = StyledCaption.overlayAnchor(line: line, alignment: alignment)
 
@@ -80,6 +88,32 @@ extension StyledCaption {
         case .percent(let p): y = max(0, min(1, p / 100.0))
         }
         return .normalized(x: position, y: y)
+    }
+
+    /// Parse a `#RRGGBB` or `#RRGGBBAA` hex color string into a `PlatformColor`.
+    /// Returns `nil` for malformed input. Pure — exposed for tests. Added v0.5.0.
+    public static func platformColor(forHex hex: String) -> PlatformColor? {
+        var s = hex.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6 || s.count == 8 else { return nil }
+        guard let value = UInt64(s, radix: 16) else { return nil }
+        let r, g, b, a: Double
+        if s.count == 6 {
+            r = Double((value >> 16) & 0xFF) / 255.0
+            g = Double((value >>  8) & 0xFF) / 255.0
+            b = Double(value & 0xFF) / 255.0
+            a = 1.0
+        } else {
+            r = Double((value >> 24) & 0xFF) / 255.0
+            g = Double((value >> 16) & 0xFF) / 255.0
+            b = Double((value >>  8) & 0xFF) / 255.0
+            a = Double(value & 0xFF) / 255.0
+        }
+        #if canImport(UIKit)
+        return PlatformColor(red: CGFloat(r), green: CGFloat(g), blue: CGFloat(b), alpha: CGFloat(a))
+        #else
+        return PlatformColor(srgbRed: CGFloat(r), green: CGFloat(g), blue: CGFloat(b), alpha: CGFloat(a))
+        #endif
     }
 
     /// Resolve the overlay's `Kadr.Anchor` from the cue's line + alignment. Anchor
