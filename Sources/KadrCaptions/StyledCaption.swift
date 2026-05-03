@@ -48,6 +48,13 @@ public struct StyledCaption: Sendable, Equatable {
     /// forward compatibility with the v0.3.x `<STYLE>`-block parser.
     public let classes: [String]
 
+    /// Foreground color as a `#RRGGBB` (or `#RRGGBBAA`) hex string, or `nil` to
+    /// inherit `baseStyle.color` at bridge time. ASS / SSA fill-color overrides
+    /// (`{\1c&HBBGGRR&}`) round-trip into this field; the
+    /// ``StyledCaption/toTextOverlay(baseStyle:animation:)`` bridge applies it
+    /// to the resulting `Kadr.TextStyle`. Added in v0.5.0.
+    public let color: String?
+
     public init(
         text: String,
         timeRange: CMTimeRange,
@@ -58,7 +65,8 @@ public struct StyledCaption: Sendable, Equatable {
         isItalic: Bool = false,
         isUnderlined: Bool = false,
         speaker: String? = nil,
-        classes: [String] = []
+        classes: [String] = [],
+        color: String? = nil
     ) {
         self.text = text
         self.timeRange = timeRange
@@ -70,6 +78,7 @@ public struct StyledCaption: Sendable, Equatable {
         self.isUnderlined = isUnderlined
         self.speaker = speaker
         self.classes = classes
+        self.color = color
     }
 }
 
