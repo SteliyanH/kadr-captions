@@ -50,12 +50,12 @@ kadr core stays AVFoundation-bridge-only — small, no third-party deps, predict
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md). v0.1.0 scope: SRT + VTT parsers and writers. iTT planned for v0.2.0. Styled-caption builder (TextOverlay mapping) for v0.3.0+.
+See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled VTT → `TextOverlay` bridge (v0.3.0), ASS / SSA (v0.4.0), styled ASS / SSA + caption time utilities (v0.5.0). Every common subtitle format has plain-text and (where applicable) styled coverage; cycle considered feature-complete.
 
 ## Installation
 
 ```swift
-.package(url: "https://github.com/SteliyanH/kadr-captions.git", from: "0.1.0"),
+.package(url: "https://github.com/SteliyanH/kadr-captions.git", from: "0.5.0"),
 ```
 
 Add `KadrCaptions` to your target's dependencies. `Kadr` is pulled in transitively (≥ `0.9.2`).

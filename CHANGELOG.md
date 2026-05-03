@@ -4,6 +4,30 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-05-03
+
+Two additions closing the remaining gaps that bring real value to consumers — caption time utilities for syncing to re-encoded video, and a styled ASS / SSA bridge so the format's most-load-bearing styling (color, bold/italic/underline, alignment) round-trips into `StyledCaption`.
+
+### Added
+
+- **`Caption.shifted(by:)`** / **`Caption.scaled(by:)`** — pure value-type transforms for shifting and scaling cue timestamps. Negative shifts clamp `start` to zero with the lost front truncating duration; zero / negative scale factors collapse to a zero-range cue rather than producing garbage. `[Caption]` array sugar mirrors both.
+- **`CaptionParser.parseStyledASS(_:)`** / **`parseStyledSSA(_:)`** — produce `[StyledCaption]` from ASS / SSA, preserving per-cue **bold / italic / underline flags**, **alignment** from `\an<N>` (modern numpad) and legacy `\a<N>` (SSA bitmask), and **foreground color** from `\1c&HBBGGRR&` / alias `\c&HBBGGRR&`. ASS alpha is flipped on import (ASS uses 0=opaque; our hex uses standard convention).
+- **`Caption.loadStyled(ass:)`** / **`loadStyled(ssa:)`** — async file loaders mirroring the plain ASS / SSA parsers, with the same UTF-8 → Windows-1252 fallback.
+- **`StyledCaption.color`** — new optional `String?` field carrying `#RRGGBB` or `#RRGGBBAA` hex. Default `nil`. The `toTextOverlay(...)` bridge applies it to the resulting `Kadr.TextStyle.color` when set.
+- **`StyledCaption.platformColor(forHex:)`** — pure `String → PlatformColor?` helper, cross-platform (UIKit + AppKit). Used by the bridge; exposed for consumers building their own.
+- Pure helpers exposed `public static`: `parseASSColorPayload(_:)` (BGR hex with alpha-flip), `mapANAlignment(_:)` / `mapLegacyAAlignment(_:)`, `parseASSOverrideFlags(_:)` (last-write-wins flag union — mirrors styled-VTT's per-cue collapse).
+
+### Tests
+
+- 41 new tests across the cycle: `CaptionTransformsTests` (13), `StyledASSTests` (28).
+
+### Notes
+
+- Karaoke timing tags (`\k50`), positioning overrides (`\pos(...)`), and font / size overrides remain stripped — `Kadr.TextStyle` can't render them, so the bridge surface tracks the engine's actual consumption.
+- Per-run inline styling collapses to a single per-cue flag, mirroring the v0.3 styled-VTT bridge.
+- `StyledCaption(...)` adds a defaulted `color: String? = nil` parameter — additive at the source level; existing callers compile unchanged.
+- Kadr floor stays at **≥ 0.9.2** — no new kadr surface required.
+
 ## [0.4.0] - 2026-04-30
 
 ASS / SSA support. Adds the fourth and final caption format — Advanced SubStation Alpha (.ass) and SubStation Alpha (.ssa). Heavily used in anime / fansub / streaming pipelines. **Completes the "every common subtitle format" matrix:** SRT + VTT + iTT + ASS + SSA. Pure additive — every v0.3 call site compiles unchanged.
