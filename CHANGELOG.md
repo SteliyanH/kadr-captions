@@ -4,6 +4,40 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-05-22
+
+Format extensions. Reopened cycle (v0.5 was marked feature-complete) to close the niche-but-real ingest gaps that have come up in downstream pipelines and bring the API in line with the modern VTT spec. Three additions, all additive — every v0.5 call site compiles unchanged.
+
+### Added — VobSub `.idx` parser (Tier 1)
+
+- **`VobSubIndex`** + **`VobSubCue`** Sendable structs — language + 16-entry palette + array of cues (start time + byte offset into the paired `.sub` file).
+- **`CaptionParser.parseVobSubIndex(_:)`** + pure helpers (`parseVobSubLanguage`, `parseVobSubPalette`, `parseVobSubTimestamp`). Timestamp uses `HH:MM:SS:mmm` colon format — strictly rejects SRT-comma / VTT-dot variants.
+- **`Caption.fromVobSubIndex(_:placeholderText:trailingDuration:)`** — bridge that renders the index as `[Caption]` with placeholder text. Cue duration inferred from gap to next cue; last cue uses caller-supplied trailing duration (the format has no end-time field).
+- Bitmap extraction from the paired `.sub` file is a v0.7 follow-up — v0.6 surfaces the index timing only so consumers can mark subtitle existence in the timeline.
+
+### Added — WebVTT cue regions (Tier 2)
+
+- **`CaptionRegion`** + **`RegionScrollMode`** types — id, widthPercent, lines, region/viewport anchors (normalized `0...1` per axis), scroll mode. Defaults align with WebVTT spec.
+- **`StyledCaption.region: CaptionRegion?`** — additive, default nil. v0.5 styled-caption call sites compile unchanged.
+- **`parseStyledVTT(_:)`** now collects REGION blocks (instead of skipping) and resolves `region:NAME` cue references. Unknown ids resolve to nil — tolerates authoring tools that strip regions mid-pipeline.
+- Pure helpers: **`parseStyledVTTRegionBlock(_:)`** + **`parseVTTRegionID(_:)`**.
+- Plain `parseVTT(_:)` unchanged — regions stay styled-only.
+
+### Added — EBU-TT-D parser (Tier 3)
+
+- **`CaptionParser.parseEBUTTD(_:)`** + **`Caption.load(ebuTTD:)`** — string + disk parsers for the European broadcast TTML profile (EBU Tech 3380).
+- **`CaptionParser.parseEBUTTDTime(_:)`** pure time helper. Accepts `HH:MM:SS` and `HH:MM:SS.mmm` only; rejects iTT's frame-count form (`HH:MM:SS:FF`) and TTML's suffix forms (`1.5s`, `1500ms`). EBU profile mandates clock-form timing.
+- Plain text only — styled EBU-TT-D's region-nested layout is a future-cycle candidate. `<br/>` inserts newlines; `<ebuttm:documentMetadata>` and `<ebutts:style>` head blocks silently skipped.
+- No `Caption.load(_:)` extension switch entry — `.xml` / `.ttml` are ambiguous with other TTML profiles. Consumers call `load(ebuTTD:)` directly.
+
+### Tests
+
+39 new tests across the cycle. Highlights: cross-format strictness pins (VobSub rejects SRT-comma timing; EBU-TT-D rejects iTT frame-count timing), region resolution edge cases (referenced / unreferenced / ghost id / multi-region), `<br/>` newline insertion, head metadata skipping. XCTest suite: 43 → 82.
+
+### Dependencies
+
+No floor bumps. Still requires kadr ≥ 0.9.2.
+
 ## [0.5.0] - 2026-05-03
 
 Two additions closing the remaining gaps that bring real value to consumers — caption time utilities for syncing to re-encoded video, and a styled ASS / SSA bridge so the format's most-load-bearing styling (color, bold/italic/underline, alignment) round-trips into `StyledCaption`.
