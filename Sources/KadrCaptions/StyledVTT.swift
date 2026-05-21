@@ -36,6 +36,95 @@ extension CaptionParser {
     /// Parse a VTT cue settings string (`align:start position:25% line:20%`) into a
     /// tuple of alignment / line / position. Unrecognized settings are ignored.
     /// Pure — exposed for tests.
+    /// Pure: extract the `region:NAME` cue-setting value, if present. v0.6.
+    ///
+    /// Kept distinct from ``parseVTTCueSettings`` so the existing 3-tuple
+    /// return shape doesn't break — consumers reading the styled parser's
+    /// new region support call this helper alongside the existing one.
+    public static func parseVTTRegionID(_ raw: String) -> String? {
+        let tokens = raw.split(whereSeparator: { $0 == " " || $0 == "\t" })
+        for token in tokens {
+            guard let colon = token.firstIndex(of: ":") else { continue }
+            let key = String(token[..<colon])
+            let value = String(token[token.index(after: colon)...])
+            if key == "region", !value.isEmpty {
+                return value
+            }
+        }
+        return nil
+    }
+
+    /// Pure: parse a REGION block's body lines into a ``CaptionRegion``.
+    /// Returns nil when no `id:` line is present — every WebVTT region
+    /// needs an id to be referenceable from a cue. v0.6.
+    public static func parseStyledVTTRegionBlock(_ bodyLines: [String]) -> CaptionRegion? {
+        var id: String?
+        var widthPercent: Double = 1.0
+        var lines: Int = 3
+        var regionAnchorX: Double = 0
+        var regionAnchorY: Double = 1.0
+        var viewportAnchorX: Double = 0
+        var viewportAnchorY: Double = 1.0
+        var scroll: RegionScrollMode = .none
+
+        for rawLine in bodyLines {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let key = String(line[..<colon])
+            let value = String(line[line.index(after: colon)...])
+            switch key {
+            case "id":
+                id = value
+            case "width":
+                if let pct = parsePercent(value) {
+                    widthPercent = pct
+                }
+            case "lines":
+                if let n = Int(value), n > 0 {
+                    lines = n
+                }
+            case "regionanchor":
+                if let (x, y) = parseAnchorPair(value) {
+                    regionAnchorX = x
+                    regionAnchorY = y
+                }
+            case "viewportanchor":
+                if let (x, y) = parseAnchorPair(value) {
+                    viewportAnchorX = x
+                    viewportAnchorY = y
+                }
+            case "scroll":
+                if value == "up" {
+                    scroll = .up
+                }
+            default:
+                break
+            }
+        }
+        guard let regionID = id else { return nil }
+        return CaptionRegion(
+            id: regionID,
+            widthPercent: widthPercent,
+            lines: lines,
+            regionAnchorX: regionAnchorX,
+            regionAnchorY: regionAnchorY,
+            viewportAnchorX: viewportAnchorX,
+            viewportAnchorY: viewportAnchorY,
+            scroll: scroll
+        )
+    }
+
+    /// Pure: parse a `Nx%,Ny%` anchor pair into a normalized `(x, y)` tuple
+    /// in `0...1`. Used by both `regionanchor:` and `viewportanchor:`.
+    static func parseAnchorPair(_ raw: String) -> (Double, Double)? {
+        let parts = raw.split(separator: ",", maxSplits: 1)
+        guard parts.count == 2 else { return nil }
+        let xRaw = parts[0].trimmingCharacters(in: .whitespaces)
+        let yRaw = parts[1].trimmingCharacters(in: .whitespaces)
+        guard let x = parsePercent(xRaw), let y = parsePercent(yRaw) else { return nil }
+        return (x, y)
+    }
+
     public static func parseVTTCueSettings(
         _ raw: String
     ) -> (alignment: StyledCaptionAlignment, line: StyledCaptionLine, position: Double) {
@@ -243,6 +332,12 @@ extension CaptionParser {
         guard isHeader else { throw CaptionParseError.missingHeader }
 
         var captions: [StyledCaption] = []
+        // v0.6: collect REGION blocks during the walk so cues can resolve
+        // their `region:NAME` references at the bottom of the file. WebVTT
+        // requires regions to appear before any cue that references them,
+        // but we don't enforce that ordering — the lookup is global to
+        // tolerate authoring tools that emit regions interleaved.
+        var regionsByID: [String: CaptionRegion] = [:]
         var i = (lines.firstIndex(of: firstNonEmpty) ?? 0) + 1
 
         while i < lines.count {
@@ -250,6 +345,19 @@ extension CaptionParser {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty {
                 i += 1
+                continue
+            }
+            if trimmed == "REGION" {
+                // v0.6 — parse the REGION block's body instead of skipping.
+                var bodyLines: [String] = []
+                i += 1
+                while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).isEmpty {
+                    bodyLines.append(lines[i])
+                    i += 1
+                }
+                if let region = parseStyledVTTRegionBlock(bodyLines) {
+                    regionsByID[region.id] = region
+                }
                 continue
             }
             if isVTTSkipBlockHeader(trimmed) {
@@ -273,6 +381,10 @@ extension CaptionParser {
                 throw CaptionParseError.malformedTimestamp(line: timestampLineIndex + 1, raw: tsRaw)
             }
             let (alignment, lineSetting, position) = parseVTTCueSettings(settingsRaw)
+            // v0.6 — resolve `region:NAME` cue setting against the regions
+            // collected from REGION blocks earlier in the file.
+            let regionID = parseVTTRegionID(settingsRaw)
+            let region: CaptionRegion? = regionID.flatMap { regionsByID[$0] }
 
             // Collect text lines until blank/EOF, accumulating styling across all of them.
             var plainLines: [String] = []
@@ -304,7 +416,8 @@ extension CaptionParser {
                 isItalic: anyItalic,
                 isUnderlined: anyUnderlined,
                 speaker: firstSpeaker,
-                classes: allClasses
+                classes: allClasses,
+                region: region
             ))
             i = j + 1
         }
