@@ -50,7 +50,7 @@ kadr core stays AVFoundation-bridge-only — small, no third-party deps, predict
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled VTT → `TextOverlay` bridge (v0.3.0), ASS / SSA (v0.4.0), styled ASS / SSA + caption time utilities (v0.5.0). Every common subtitle format has plain-text and (where applicable) styled coverage; cycle considered feature-complete.
+See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled VTT → `TextOverlay` bridge (v0.3.0), ASS / SSA (v0.4.0), styled ASS / SSA + caption time utilities (v0.5.0), VobSub `.idx` + WebVTT cue regions + EBU-TT-D (v0.6.0). Covers every common subtitle format with plain-text + (where applicable) styled support, plus DVD-era image-based subtitles and European broadcast TTML.
 
 ## Installation
 
