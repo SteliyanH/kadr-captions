@@ -55,6 +55,16 @@ public struct StyledCaption: Sendable, Equatable {
     /// to the resulting `Kadr.TextStyle`. Added in v0.5.0.
     public let color: String?
 
+    /// WebVTT REGION reference, resolved by the styled VTT parser. `nil`
+    /// when the cue carries no `region:NAME` setting or when its named
+    /// region wasn't declared in the file. v0.6.
+    ///
+    /// `StyledCaption.toTextOverlay(...)` ignores this today — region
+    /// rendering needs a kadr-ui surface that's out of scope for v0.6.
+    /// Consumers wanting region-aware layout read this field directly and
+    /// position the overlay themselves.
+    public let region: CaptionRegion?
+
     public init(
         text: String,
         timeRange: CMTimeRange,
@@ -66,7 +76,8 @@ public struct StyledCaption: Sendable, Equatable {
         isUnderlined: Bool = false,
         speaker: String? = nil,
         classes: [String] = [],
-        color: String? = nil
+        color: String? = nil,
+        region: CaptionRegion? = nil
     ) {
         self.text = text
         self.timeRange = timeRange
@@ -79,6 +90,7 @@ public struct StyledCaption: Sendable, Equatable {
         self.speaker = speaker
         self.classes = classes
         self.color = color
+        self.region = region
     }
 }
 
