@@ -56,6 +56,16 @@ Closes the high-value gaps from a final feature audit. Pure additive — every v
 
 Cycle considered feature-complete pending kadr v1.0.
 
+## v0.6.0 — Format extensions *(planned)*
+
+Reopened cycle. v0.5 covered every common SUBTITLE format consumers asked for (SRT / VTT / iTT / ASS / SSA, plain + styled). v0.6 fills the niche-but-useful gaps that have come up in real ingest pipelines downstream, plus brings the API in line with the modern VTT spec. Three additions, all additive — every v0.5 call site compiles unchanged:
+
+- **`.idx` / `.sub` (VobSub) parsing.** Image-based DVD subtitle format. We parse the `.idx` index file (timing + palette + position) and either (a) drop a `Caption` whose text is `nil` so the consumer knows a subtitle existed but couldn't be extracted, or (b) eventually surface the bitmap via a new `StyledCaption.image: PlatformImage?` field. Option (a) for v0.6; (b) is a v0.7 follow-up if real users want it.
+- **WebVTT cue regions (`::cue(region)`, `REGION` blocks).** The modern VTT spec adds region positioning + scrolling text that today's `CaptionParser.parseVTT(_:)` ignores. Lift to `StyledCaption.region: CaptionRegion?` (anchor + width + lines + scroll mode). The non-styled `parseVTT(_:)` path stays cleanly stripped; only `parseStyledVTT(_:)` exposes regions.
+- **EBU-TT-D parser.** European broadcast subtitle profile (BBC / EBU). Distinct XML namespace from iTT but shares the TTML lineage; iTT's existing parser is a useful starting point. Plain text only for v0.6 — styled EBU-TT-D involves complex region nesting that's out of scope.
+
+Three tiers + release prep. Pairs with no upstream changes (parser additions only). Pure ingest expansion — nothing changes for consumers who only care about SRT / VTT / iTT / ASS / SSA.
+
 ## Compatibility track record
 
 | KadrCaptions | Requires Kadr |
