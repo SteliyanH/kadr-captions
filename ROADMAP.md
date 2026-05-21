@@ -56,15 +56,15 @@ Closes the high-value gaps from a final feature audit. Pure additive — every v
 
 Cycle considered feature-complete pending kadr v1.0.
 
-## v0.6.0 — Format extensions *(planned)*
+## v0.6.0 — Format extensions ✓ shipped
 
-Reopened cycle. v0.5 covered every common SUBTITLE format consumers asked for (SRT / VTT / iTT / ASS / SSA, plain + styled). v0.6 fills the niche-but-useful gaps that have come up in real ingest pipelines downstream, plus brings the API in line with the modern VTT spec. Three additions, all additive — every v0.5 call site compiles unchanged:
+Reopened cycle (v0.5 was marked feature-complete) to close niche-but-real ingest gaps. Three additions, all additive — every v0.5 call site compiles unchanged.
 
-- **`.idx` / `.sub` (VobSub) parsing.** Image-based DVD subtitle format. We parse the `.idx` index file (timing + palette + position) and either (a) drop a `Caption` whose text is `nil` so the consumer knows a subtitle existed but couldn't be extracted, or (b) eventually surface the bitmap via a new `StyledCaption.image: PlatformImage?` field. Option (a) for v0.6; (b) is a v0.7 follow-up if real users want it.
-- **WebVTT cue regions (`::cue(region)`, `REGION` blocks).** The modern VTT spec adds region positioning + scrolling text that today's `CaptionParser.parseVTT(_:)` ignores. Lift to `StyledCaption.region: CaptionRegion?` (anchor + width + lines + scroll mode). The non-styled `parseVTT(_:)` path stays cleanly stripped; only `parseStyledVTT(_:)` exposes regions.
-- **EBU-TT-D parser.** European broadcast subtitle profile (BBC / EBU). Distinct XML namespace from iTT but shares the TTML lineage; iTT's existing parser is a useful starting point. Plain text only for v0.6 — styled EBU-TT-D involves complex region nesting that's out of scope.
+- **VobSub `.idx` parser** — `VobSubIndex` + `VobSubCue` types + `parseVobSubIndex` + `Caption.fromVobSubIndex(_:)` bridge. Index timing + palette + filepos surfaced; bitmap extraction deferred to v0.7.
+- **WebVTT cue regions** — `CaptionRegion` + `RegionScrollMode` types; `StyledCaption.region: CaptionRegion?` field; `parseStyledVTT` resolves `region:NAME` cue references against REGION blocks declared in the file. Plain `parseVTT` stays cleanly stripped.
+- **EBU-TT-D parser** — `parseEBUTTD(_:)` + `Caption.load(ebuTTD:)` for the European broadcast TTML profile. Strict clock-form timing (rejects iTT frame-count + TTML suffix forms). Plain text only.
 
-Three tiers + release prep. Pairs with no upstream changes (parser additions only). Pure ingest expansion — nothing changes for consumers who only care about SRT / VTT / iTT / ASS / SSA.
+39 new tests across the cycle. XCTest suite 43 → 82. Pure ingest expansion — no upstream changes needed.
 
 ## Compatibility track record
 
@@ -75,6 +75,7 @@ Three tiers + release prep. Pairs with no upstream changes (parser additions onl
 | 0.3.0 | ≥ 0.9.2 |
 | 0.4.0 | ≥ 0.9.2 |
 | 0.5.0 | ≥ 0.9.2 |
+| 0.6.0 | ≥ 0.9.2 |
 
 ## Contributing
 
