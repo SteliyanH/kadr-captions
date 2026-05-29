@@ -77,6 +77,15 @@ Reopened cycle (v0.5 was marked feature-complete) to close niche-but-real ingest
 | 0.5.0 | ≥ 0.9.2 |
 | 0.6.0 | ≥ 0.9.2 |
 
+## v0.7.0 — VobSub bitmap extraction + caption-utility helpers *(planned)*
+
+Reopened cycle. v0.6 surfaced the `.idx` half of VobSub (timing + palette + filepos) but explicitly punted the `.sub` bitmap decode to v0.7. This cycle closes that gap and bundles a small set of caption-utility helpers that have come up downstream as one-liners consumers keep reimplementing. Pure additive — every v0.6 call site compiles unchanged. Two tiers:
+
+- **VobSub `.sub` SPU bitmap extraction.** New `extractVobSubBitmaps(idx:sub:)` async helper decodes the run-length-encoded subpicture units (SPUs) referenced by `VobSubCue.fileOffset` and returns a `[VobSubBitmap]` — each entry pairs the cue timing with a `CGImage` rendered from the SPU's 2-bit indexed pixels through the `.idx` palette. `VobSubBitmap` also carries the SPU's control-sequence `end: CMTime` (display duration), which the `.idx` alone can't tell you. Free per the locked premium scope — bitmap decode is pure parser work; AI / OCR stays out.
+- **Caption-utility helpers.** Pure value-type transforms in the same shape as v0.5's `shifted(by:)` / `scaled(by:)`. Three additions: `Caption.merged(within:)` collapses adjacent cues whose gap is below a threshold; `Caption.split(at:)` cleaves one cue into two at a given offset; `Caption.snappedToFrameRate(_:)` rounds start / end to the nearest frame boundary for export-friendly timing. Array sugar mirrors each.
+
+Two tiers + release prep. Pure ingest + utility expansion — nothing changes for consumers who only need the v0.6 happy path.
+
 ## Contributing
 
 Open an issue on this repo for parsing edge cases, or on [kadr](https://github.com/SteliyanH/kadr) for upstream caption-surface requests.
