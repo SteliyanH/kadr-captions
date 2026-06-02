@@ -4,6 +4,33 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-06-02
+
+Reopened cycle. Closes the bitmap-decode gap v0.6 explicitly deferred and bundles three caption-utility helpers consumers were reimplementing as one-liners. Pure additive — every v0.6 call site compiles unchanged. Kadr floor stays at **0.9.2**.
+
+### Added — VobSub `.sub` SPU bitmap extraction (Tier 1)
+
+- **`CaptionParser.extractVobSubBitmaps(idx:sub:)`** — async; decodes the SPU packets referenced by each `VobSubCue.fileOffset` in the paired `.sub` blob and returns `[VobSubBitmap]`. Each entry pairs the cue's start with the SPU's stop-display end (the `.idx` alone can't tell you duration — that's encoded in the SPU control sequence) and the rendered RGBA `CGImage`.
+- **`VobSubBitmap`** value type — `start: CMTime`, `end: CMTime`, `image: CGImage`.
+- Handles both bare-SPU `.sub` layouts and MPEG-2 PS / PES-wrapped `.sub` files. Bad cues (truncated stream, unrecognized control command, palette out of range) drop silently — dropping one cue beats throwing the whole batch.
+- Free per the locked premium scope. Bitmap decode is pure parser work; AI / OCR stays in **kadr-pro**.
+
+### Added — Caption-utility helpers (Tier 2)
+
+- **`Caption.split(at: CMTime) -> (Caption, Caption)`** — cleave one cue at an absolute timestamp. Out-of-range splits collapse one half to zero duration at the appropriate boundary.
+- **`Caption.snappedToFrameRate(_: Double) -> Caption`** + array sugar — round `start` / `end` to the nearest frame boundary for the given rate (23.976 / 24 / 25 / 29.97 / 30 / 60). Non-positive or non-finite rates no-op so the editor's validation surfaces bad input.
+- **`Array<Caption>.merged(within: CMTime) -> [Caption]`** — collapse adjacent / overlapping cues whose gap is ≤ threshold. Text joins on `\n`. Order-preserving; does not sort.
+
+### Tests
+
+- 27 new tests across `VobSubBitmapTests` (13) and `CaptionTransformsTests` (14). Covers RGB hex parse, 4 / 8 / 12 / 16-bit RLE cascade + truncation + run-to-EOL, SPU control-sequence round-trip, image dimensions, bare-SPU and PES-wrapped end-to-end paths, bad-cue drop, stop-delay fallback, midpoint / out-of-range splits, integer + non-integer frame snap, invalid-rate no-op, array snap, merge with adjacent / overlapping / gap-exceeding / empty / single / empty-text edge cases.
+
+### Notes
+
+- `extractVobSubBitmaps` is async only because real call sites read the `.sub` off disk; the decode itself is synchronous. Pre-load the bytes once — `.sub` files are typically a few megabytes.
+- The renderer interleaves top / bottom RLE fields per the SPU spec; alpha is scaled from the SPU's 4-bit field to 8-bit (×17) so palette index 0 with alpha 0 is fully transparent.
+- `merged(within:)` treats overlapping cues (negative gap) as merge candidates — they share screen time anyway, joining the text is the only sensible default.
+
 ## [0.6.0] - 2026-05-22
 
 Format extensions. Reopened cycle (v0.5 was marked feature-complete) to close the niche-but-real ingest gaps that have come up in downstream pipelines and bring the API in line with the modern VTT spec. Three additions, all additive — every v0.5 call site compiles unchanged.
