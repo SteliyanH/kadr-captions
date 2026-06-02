@@ -42,6 +42,10 @@ try await CaptionAuthor.writeVTT(cues, to: outputVTT)
 | `CaptionAuthor.renderSRT(_:)` / `renderVTT(_:)` / `renderITT(_:)` / `renderASS(_:)` / `renderSSA(_:)` *(v0.4)* | Pure render helpers (string form) |
 | `StyledCaption.toTextOverlay(baseStyle:animation:)` *(v0.3)* | Bridge to `Kadr.TextOverlay` for burned-in styled captions |
 | `Video.styledCaptions(_:baseStyle:animation:)` *(v0.3)* | Overlay every styled cue with per-cue visibility |
+| `CaptionParser.extractVobSubBitmaps(idx:sub:)` *(v0.7)* | Async `[VobSubBitmap]` — RLE-decoded SPU bitmaps for iPhone-era DVD subtitle pairs |
+| `Caption.split(at:)` *(v0.7)* | Cleave a cue at an absolute timestamp into a pair |
+| `Caption.snappedToFrameRate(_:)` *(v0.7)* | Round cue boundaries to the nearest frame (23.976 / 24 / 25 / 29.97 / 30 / 60) |
+| `Array<Caption>.merged(within:)` *(v0.7)* | Collapse adjacent / overlapping cues whose gap is ≤ threshold (newline-joined text) |
 | `CaptionParseError` | Typed errors with source-line metadata |
 
 ## Why a separate package?
@@ -50,12 +54,12 @@ kadr core stays AVFoundation-bridge-only — small, no third-party deps, predict
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled VTT → `TextOverlay` bridge (v0.3.0), ASS / SSA (v0.4.0), styled ASS / SSA + caption time utilities (v0.5.0), VobSub `.idx` + WebVTT cue regions + EBU-TT-D (v0.6.0). Covers every common subtitle format with plain-text + (where applicable) styled support, plus DVD-era image-based subtitles and European broadcast TTML.
+See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled VTT → `TextOverlay` bridge (v0.3.0), ASS / SSA (v0.4.0), styled ASS / SSA + caption time utilities (v0.5.0), VobSub `.idx` + WebVTT cue regions + EBU-TT-D (v0.6.0), VobSub `.sub` SPU bitmap extraction + caption merge / split / frame-snap utilities (v0.7.0). Covers every common subtitle format with plain-text + (where applicable) styled support, plus DVD-era image-based subtitles end-to-end and European broadcast TTML.
 
 ## Installation
 
 ```swift
-.package(url: "https://github.com/SteliyanH/kadr-captions.git", from: "0.5.0"),
+.package(url: "https://github.com/SteliyanH/kadr-captions.git", from: "0.7.0"),
 ```
 
 Add `KadrCaptions` to your target's dependencies. `Kadr` is pulled in transitively (≥ `0.9.2`).

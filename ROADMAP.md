@@ -76,8 +76,9 @@ Reopened cycle (v0.5 was marked feature-complete) to close niche-but-real ingest
 | 0.4.0 | ≥ 0.9.2 |
 | 0.5.0 | ≥ 0.9.2 |
 | 0.6.0 | ≥ 0.9.2 |
+| 0.7.0 | ≥ 0.9.2 |
 
-## v0.7.0 — VobSub bitmap extraction + caption-utility helpers *(planned)*
+## v0.7.0 — VobSub bitmap extraction + caption-utility helpers ✓ shipped
 
 Reopened cycle. v0.6 surfaced the `.idx` half of VobSub (timing + palette + filepos) but explicitly punted the `.sub` bitmap decode to v0.7. This cycle closes that gap and bundles a small set of caption-utility helpers that have come up downstream as one-liners consumers keep reimplementing. Pure additive — every v0.6 call site compiles unchanged. Two tiers:
 
