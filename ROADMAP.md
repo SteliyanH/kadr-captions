@@ -78,6 +78,10 @@ Reopened cycle (v0.5 was marked feature-complete) to close niche-but-real ingest
 | 0.6.0 | ≥ 0.9.2 |
 | 0.7.0 | ≥ 0.9.2 |
 
+## v0.8.0 — iOS 17 platform floor ✓ shipped
+
+Mechanical floor bump to **iOS 17 / macOS 14 / tvOS 17 / visionOS 1** (`Package.swift` platforms + Kadr dependency floor → ≥ 0.15.0). No source or behavior change — required because a package with an iOS 16 floor can't depend on Kadr 0.15 (iOS 17). Part of the coordinated ecosystem move to the iOS 17 baseline (kadr v0.15 / kadr-ui v0.12 / kadr-captions v0.8 / kadr-photos / reels-studio `@Observable`). Consumers needing iOS 16 stay on `0.7.x`. 200 tests unchanged.
+
 ## v0.7.0 — VobSub bitmap extraction + caption-utility helpers ✓ shipped
 
 Reopened cycle. v0.6 surfaced the `.idx` half of VobSub (timing + palette + filepos) but explicitly punted the `.sub` bitmap decode to v0.7. This cycle closes that gap and bundles a small set of caption-utility helpers that have come up downstream as one-liners consumers keep reimplementing. Pure additive — every v0.6 call site compiles unchanged. Two tiers:
