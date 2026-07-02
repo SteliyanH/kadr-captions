@@ -4,6 +4,18 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-07-02
+
+Platform floor raised to **iOS 17 / macOS 14 / tvOS 17 / visionOS 1** as part of the coordinated ecosystem move to the iOS 17 baseline (so `kadr-reels-studio` can adopt the `@Observable` macro). No source or behavior change — a package with an iOS 16 floor can't depend on Kadr 0.15 (iOS 17), so this bump keeps KadrCaptions compatible with the current Kadr line.
+
+### Changed
+
+- **`Package.swift` platforms** → `.iOS(.v17)` / `.macOS(.v14)` / `.tvOS(.v17)` / `.visionOS(.v1)` (was iOS 16 / macOS 13 / tvOS 16); **Kadr dependency floor → ≥ 0.15.0** (was 0.9.2).
+
+### Compatibility
+
+Requires **Kadr ≥ 0.15.0**. No API changes; consumers needing the iOS 16 floor stay on the **0.7.x** line. Suite unchanged (200 tests, 0 failures).
+
 ## [0.7.0] - 2026-06-02
 
 Reopened cycle. Closes the bitmap-decode gap v0.6 explicitly deferred and bundles three caption-utility helpers consumers were reimplementing as one-liners. Pure additive — every v0.6 call site compiles unchanged. Kadr floor stays at **0.9.2**.

@@ -4,16 +4,16 @@ import PackageDescription
 let package = Package(
     name: "KadrCaptions",
     platforms: [
-        .iOS(.v16),
-        .macOS(.v13),
-        .tvOS(.v16),
+        .iOS(.v17),
+        .macOS(.v14),
+        .tvOS(.v17),
         .visionOS(.v1)
     ],
     products: [
         .library(name: "KadrCaptions", targets: ["KadrCaptions"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/SteliyanH/kadr.git", from: "0.9.2"),
+        .package(url: "https://github.com/SteliyanH/kadr.git", from: "0.15.0"),
     ],
     targets: [
         .target(
