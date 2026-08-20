@@ -4,6 +4,19 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-08-21
+
+Documentation and dependency hygiene. No API or behaviour change.
+
+### Documentation
+
+- **Added a DocC catalog.** This package previously had no documentation surface beyond a table in the README — which, for a package whose entire job is format handling, is the difference between "parses subtitles" and knowing which formats round-trip and why burn-in is a separate path. The catalog leads with the distinction a caller actually has to make: kadr core bakes *soft* captions as an `AVMetadataItem` group that players can switch off and most platforms strip on re-encode, while `StyledCaption` plus the `TextOverlay` bridge is the burned-in path that survives.
+- **Added `.spi.yml`.** Without it the Swift Package Index has nothing to build, so the catalog would have stayed invisible to anyone evaluating the package.
+
+### Changed
+
+- **The kadr dependency is pinned `.upToNextMinor`.** `from:` means `.upToNextMajor`, and SwiftPM does not special-case `0.x` — so the previous range accepted every future 0.x release of kadr, including breaking ones. kadr's minors do break: 0.15.0 raised the platform floor.
+
 ## [0.8.0] - 2026-07-02
 
 Platform floor raised to **iOS 17 / macOS 14 / tvOS 17 / visionOS 1** as part of the coordinated ecosystem move to the iOS 17 baseline (so `kadr-reels-studio` can adopt the `@Observable` macro). No source or behavior change — a package with an iOS 16 floor can't depend on Kadr 0.15 (iOS 17), so this bump keeps KadrCaptions compatible with the current Kadr line.
