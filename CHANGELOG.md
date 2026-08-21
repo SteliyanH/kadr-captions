@@ -4,6 +4,30 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-08-21
+
+Error messages a person can read. Minor rather than patch:
+`CaptionParseError` gains a protocol conformance it did not have, and
+`localizedDescription` changes observably.
+
+### Added
+
+- **`CaptionParseError` conforms to `LocalizedError`.** Caption files are
+  usually not authored by the person importing them — they arrive from a
+  transcription service, a download, or a colleague — so these failures reach
+  someone who cannot be expected to know the file's internal structure, and who
+  previously saw an NSError code.
+
+  The wording names the line and the offending text for a malformed timestamp
+  or cue index, because that is the detail that makes a bad file fixable; names
+  the supported formats when the format is wrong; and handles an empty
+  extension, which would otherwise have rendered as `"“.” files aren't..."`.
+  File names appear without their paths.
+
+### Compatibility
+
+Requires kadr >= 0.16.0.
+
 ## [0.8.1] - 2026-08-21
 
 Documentation and dependency hygiene. No API or behaviour change.
