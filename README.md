@@ -70,3 +70,5 @@ Add `KadrCaptions` to your target's dependencies. `Kadr` is pulled in transitive
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+Contributions are accepted under the [Contributor License Agreement](CLA.md), which is signed once and covers all future contributions. It does not transfer ownership — you keep the copyright in your work.
