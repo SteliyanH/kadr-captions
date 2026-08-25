@@ -7,7 +7,7 @@
 
 **Caption file parsing and authoring for [Kadr](https://github.com/SteliyanH/kadr) — produce `Caption` values from SRT / VTT / iTT files, write them back, and (later) map styled cues onto kadr's `TextOverlay` surface.**
 
-KadrCaptions consumes kadr v0.9.2's `Caption` value type and `Video.captions(_:)` modifier. Core kadr ships only the AVFoundation bridge (caption → `AVMetadataItem` at export). This adapter handles the file-format ecosystem.
+KadrCaptions consumes kadr's `Caption` value type and `Video.captions(_:)` modifier. Core kadr ships only the AVFoundation bridge (caption → `AVMetadataItem` at export). This adapter handles the file-format ecosystem.
 
 ## Quick Start
 
@@ -60,10 +60,12 @@ See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled 
 ## Installation
 
 ```swift
-.package(url: "https://github.com/SteliyanH/kadr-captions.git", from: "0.7.0"),
+.package(url: "https://github.com/SteliyanH/kadr-captions.git", .upToNextMinor(from: "0.10.0")),
 ```
 
-Add `KadrCaptions` to your target's dependencies. `Kadr` is pulled in transitively (≥ `0.9.2`).
+Add `KadrCaptions` to your target's dependencies. `Kadr` is pulled in transitively — 0.10.x resolves `>=0.17.0, <0.18.0`.
+
+> **Use `.upToNextMinor`, not `from:`.** `from:` means `.upToNextMajor`, and SwiftPM does not special-case `0.x` — so `from: "0.10.0"` would accept every future 0.x release including breaking ones. This package's own kadr dependency is pinned the same way, because kadr's minors do break: 0.15.0 raised the platform floor.
 
 ## License
 
