@@ -4,6 +4,27 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-08-27
+
+Adopts kadr 0.20.0.
+
+### Changed
+
+- **kadr floor raised to `0.20.0`** (from `0.17.0`). Three minors at once: kadr
+  0.18 added per-clip volume and moved waveform extraction into core, 0.19 added
+  waveform resampling, and 0.20 added export bitrate control and generated sample
+  media. None of it is surface this package consumes; the bump exists so the
+  family can compose.
+
+  **That composition was actually broken.** The pins are `.upToNextMinor`, so each
+  adapter accepts exactly one kadr minor — and with kadr-ui on 0.19, this package
+  and kadr-photos on 0.17, and kadr-audio on 0.20, **no single kadr version
+  satisfied all four**. An app depending on the family had no resolvable graph.
+
+  That is the standing cost of `.upToNextMinor`: every kadr minor is a coordinated
+  release across the family, and skipping the coordination makes the packages
+  silently un-composable rather than loudly incompatible.
+
 ## [0.10.0] - 2026-08-22
 
 Adopts kadr 0.17.0, and corrects a false statement in 0.9.0's notes.
