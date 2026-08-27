@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/Sponsor-Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/steliyanh)
 
-**Caption file parsing and authoring for [Kadr](https://github.com/SteliyanH/kadr) — produce `Caption` values from SRT / VTT / iTT files, write them back, and (later) map styled cues onto kadr's `TextOverlay` surface.**
+**Caption parsing and burn-in for [Kadr](https://github.com/SteliyanH/kadr) — read SRT / VTT / iTT / ASS / SSA / VobSub, write them back, and burn styled cues into the video itself.**
 
 KadrCaptions consumes kadr's `Caption` value type and `Video.captions(_:)` modifier. Core kadr ships only the AVFoundation bridge (caption → `AVMetadataItem` at export). This adapter handles the file-format ecosystem.
 
@@ -55,7 +55,7 @@ kadr core stays AVFoundation-bridge-only — small, no third-party deps, predict
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled VTT → `TextOverlay` bridge (v0.3.0), ASS / SSA (v0.4.0), styled ASS / SSA + caption time utilities (v0.5.0), VobSub `.idx` + WebVTT cue regions + EBU-TT-D (v0.6.0), VobSub `.sub` SPU bitmap extraction + caption merge / split / frame-snap utilities (v0.7.0). Covers every common subtitle format with plain-text + (where applicable) styled support, plus DVD-era image-based subtitles end-to-end and European broadcast TTML.
+See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled VTT → `TextOverlay` bridge (v0.3.0), ASS / SSA (v0.4.0), styled ASS / SSA + caption time utilities (v0.5.0), VobSub `.idx` + WebVTT cue regions + EBU-TT-D (v0.6.0), VobSub `.sub` SPU bitmap extraction + caption merge / split / frame-snap utilities (v0.7.0), iOS 17 platform floor (v0.8.0), DocC catalogue + `.upToNextMinor` pinning (v0.8.1), `LocalizedError` conformance (v0.9.0), kadr 0.17 adoption (v0.10.0). Covers every common subtitle format with plain-text + (where applicable) styled support, plus DVD-era image-based subtitles end-to-end and European broadcast TTML.
 
 ## Installation
 
@@ -67,6 +67,27 @@ Add `KadrCaptions` to your target's dependencies. `Kadr` is pulled in transitive
 
 > **Use `.upToNextMinor`, not `from:`.** `from:` means `.upToNextMajor`, and SwiftPM does not special-case `0.x` — so `from: "0.10.0"` would accept every future 0.x release including breaking ones. This package's own kadr dependency is pinned the same way, because kadr's minors do break: 0.15.0 raised the platform floor.
 
+## Burn-in
+
+Soft captions are metadata: a player can switch them off, and most platforms strip them on re-encode. Burned-in captions are pixels, and they survive anywhere the video goes — which is what social video needs.
+
+`StyledCaption` renders through kadr's `TextOverlay`, so a styled cue becomes part of the composition:
+
+```swift
+let cues = try await Caption.loadStyled(vtt: vttURL)
+
+let video = Video {
+    VideoClip(url: footage)
+}
+.styledCaptions(cues, animation: .fadeIn(duration: 0.3))
+```
+
+Colour, bold, italic, alignment and WebVTT position / anchor semantics all carry through, and each cue is visible only for its own time range.
+
+**Known limits.** Karaoke tags, `\pos(...)` and font / size overrides are stripped, because `TextStyle` cannot render them. Cue timing is taken from the caption file, which is relative to the source asset — trimming a clip or applying a speed curve will drift the captions against the composition timeline.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+Contributions are accepted under the [Contributor License Agreement](CLA.md), which is signed once and covers all future contributions. It does not transfer ownership — you keep the copyright in your work.
