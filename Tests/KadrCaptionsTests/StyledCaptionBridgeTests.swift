@@ -245,4 +245,47 @@ struct StyledCaptionBridgeTests {
         #expect(textOverlays.count == 2)
         #expect(textOverlays.allSatisfy { $0.textAnimation != nil })
     }
+
+    // MARK: - Where the burned-in text lands
+
+    /// The box kadr (1.2 and later) draws an un-sized caption in: its text's own
+    /// size, placed by the caption's position and anchor. Before kadr 1.2 that box
+    /// was the whole canvas, so a bottom caption's box ran from above the top of the
+    /// frame down to 92%, and its text was drawn near the top.
+    private func exportFrame(_ overlay: TextOverlay, in canvas: CGSize) -> CGRect {
+        let natural = overlay.naturalSize(in: canvas)
+        return Kadr.Layout.resolveFrame(
+            position: overlay.position,
+            size: overlay.size ?? .pixels(width: Double(natural.width), height: Double(natural.height)),
+            anchor: overlay.anchor,
+            in: canvas
+        )
+    }
+
+    @Test func bottomCaptionSitsAtTheBottom() {
+        let canvas = CGSize(width: 1080, height: 1920)
+        let overlay = cue(text: "Bottom line").toTextOverlay(baseStyle: TextStyle(fontSize: 48))
+        #expect(overlay.size == nil, "captions rely on kadr's text-sized box")
+        let frame = exportFrame(overlay, in: canvas)
+        #expect(abs(frame.maxY - canvas.height * 0.92) < 1, "text bottom at the 92% line")
+        #expect(frame.minY > canvas.height * 0.8, "text in the lower part of the frame, top at \(frame.minY)")
+        #expect(abs(frame.midX - canvas.width / 2) < 1)
+    }
+
+    @Test func topCaptionSitsAtTheTop() {
+        let canvas = CGSize(width: 1920, height: 1080)
+        let overlay = cue(text: "Top line", line: .top).toTextOverlay(baseStyle: TextStyle(fontSize: 48))
+        let frame = exportFrame(overlay, in: canvas)
+        #expect(abs(frame.minY - canvas.height * 0.08) < 1, "text top at the 8% line")
+        #expect(frame.maxY < canvas.height * 0.25)
+    }
+
+    @Test func longCaptionWrapsInsideTheFrame() {
+        let canvas = CGSize(width: 1080, height: 1920)
+        let text = String(repeating: "a long caption line ", count: 8)
+        let frame = exportFrame(cue(text: text).toTextOverlay(baseStyle: TextStyle(fontSize: 48)), in: canvas)
+        #expect(frame.width <= canvas.width)
+        #expect(frame.minX >= 0 && frame.maxX <= canvas.width)
+        #expect(frame.minY > 0, "every line on screen")
+    }
 }
