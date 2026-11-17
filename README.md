@@ -58,17 +58,17 @@ kadr core stays AVFoundation-bridge-only — small, no third-party deps, predict
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled VTT → `TextOverlay` bridge (v0.3.0), ASS / SSA (v0.4.0), styled ASS / SSA + caption time utilities (v0.5.0), VobSub `.idx` + WebVTT cue regions + EBU-TT-D (v0.6.0), VobSub `.sub` SPU bitmap extraction + caption merge / split / frame-snap utilities (v0.7.0), iOS 17 platform floor (v0.8.0), DocC catalogue + `.upToNextMinor` pinning (v0.8.1), `LocalizedError` conformance (v0.9.0), kadr 0.17 adoption (v0.10.0). Covers every common subtitle format with plain-text + (where applicable) styled support, plus DVD-era image-based subtitles end-to-end and European broadcast TTML.
+See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled VTT → `TextOverlay` bridge (v0.3.0), ASS / SSA (v0.4.0), styled ASS / SSA + caption time utilities (v0.5.0), VobSub `.idx` + WebVTT cue regions + EBU-TT-D (v0.6.0), VobSub `.sub` SPU bitmap extraction + caption merge / split / frame-snap utilities (v0.7.0), iOS 17 platform floor (v0.8.0), DocC catalogue + `.upToNextMinor` pinning (v0.8.1), `LocalizedError` conformance (v0.9.0), kadr 0.17 adoption (v0.10.0), kadr 0.20 (v0.11.0), kadr 1.0 (v0.12.0), captions burned in at their WebVTT line with kadr 1.2 (v0.13.0). Covers every common subtitle format with plain-text + (where applicable) styled support, plus DVD-era image-based subtitles end-to-end and European broadcast TTML.
 
 ## Installation
 
 ```swift
-.package(url: "https://github.com/SteliyanH/kadr-captions.git", .upToNextMinor(from: "0.12.0")),
+.package(url: "https://github.com/SteliyanH/kadr-captions.git", .upToNextMinor(from: "0.13.0")),
 ```
 
 Add `KadrCaptions` to your target's dependencies. `Kadr` is pulled in transitively — 0.10.x resolves `>=0.17.0, <0.18.0`.
 
-> **Use `.upToNextMinor`, not `from:`.** `from:` means `.upToNextMajor`, and SwiftPM does not special-case `0.x` — so `from: "0.12.0"` would accept every future 0.x release including breaking ones. This package's own kadr dependency is pinned the same way, because kadr's minors do break: 0.15.0 raised the platform floor.
+> **Use `.upToNextMinor`, not `from:`.** `from:` means `.upToNextMajor`, and SwiftPM does not special-case `0.x` — so `from: "0.13.0"` would accept every future 0.x release including breaking ones. (This package's own kadr dependency uses `from:`, because kadr is past 1.0 and its minors no longer break.)
 
 ## Burn-in
 
