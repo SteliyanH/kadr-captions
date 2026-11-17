@@ -91,7 +91,7 @@ Colour, bold, italic, alignment and WebVTT position / anchor semantics all carry
 
 ## Requirements
 
-Swift 6 · iOS 17 · macOS 14 · tvOS 17 · visionOS 1 · kadr 1.0+
+Xcode 26 (Swift 6.2) · iOS 17 · macOS 14 · tvOS 17 · visionOS 1 · kadr 1.2+
 
 ## The kadr ecosystem
 

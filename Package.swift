@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
@@ -13,7 +13,7 @@ let package = Package(
         .library(name: "KadrCaptions", targets: ["KadrCaptions"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/SteliyanH/kadr.git", from: "1.0.0"),
+        .package(url: "https://github.com/SteliyanH/kadr.git", from: "1.2.0"),
     ],
     targets: [
         .target(

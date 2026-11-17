@@ -4,6 +4,25 @@ All notable changes to KadrCaptions will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Burned-in captions sit where WebVTT places them.** `toTextOverlay` and
+  `Video.styledCaptions` give a caption a position and an anchor but no size,
+  and before kadr 1.2 kadr laid un-sized text out in a box the size of the whole
+  canvas, drawn at its top. A bottom caption (`line` auto or bottom, anchored at
+  92% of the height) therefore came out near the top of the frame, partly
+  above it. kadr 1.2 sizes the box to the text, so a bottom caption now sits on
+  the 92% line and a top caption on the 8% line. No code change here: this
+  release requires kadr 1.2 so every user gets it. New tests pin both lines and
+  check that a long caption wraps inside the frame.
+
+### Changed
+
+- **Requires kadr 1.2.0, and so Xcode 26 (Swift 6.2).** The manifest declares
+  `swift-tools-version: 6.2`, the floor kadr 1.2 declares.
+
 ## [0.12.0] - 2026-08-28
 
 Adopts kadr 1.0.
