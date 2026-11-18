@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/Sponsor-Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/steliyanh)
 
-**Caption parsing and burn-in for [Kadr](https://github.com/SteliyanH/kadr) — read SRT / VTT / iTT / ASS / SSA / VobSub, write them back, and burn styled cues into the video itself.**
+**Caption parsing and burn-in for [Kadr](https://github.com/SteliyanH/kadr) — read SRT / VTT / iTT / ASS / SSA / EBU-TT-D / VobSub, write SRT / VTT / iTT / ASS / SSA back, and burn styled cues into the video itself.**
 
 **[API documentation →](https://swiftpackageindex.com/SteliyanH/kadr-captions/documentation)**  ·  built and hosted by the Swift Package Index for every release.
 
@@ -18,7 +18,7 @@ KadrCaptions consumes kadr's `Caption` value type and `Video.captions(_:)` modif
 import Kadr
 import KadrCaptions
 
-// Auto-detect by extension (.srt / .vtt)
+// Auto-detect by extension (.srt / .vtt / .itt / .ass / .ssa)
 let cues = try await Caption.load(subtitleURL)
 
 let video = Video {
@@ -26,7 +26,7 @@ let video = Video {
 }
 .captions(cues)
 
-try await video.export(to: outputURL)  // captions baked as AVMetadataItem at export
+let url = try await video.export(to: outputURL)  // captions baked as AVMetadataItem at export
 
 // Or write captions back to disk:
 try await CaptionAuthor.writeSRT(cues, to: outputSRT)
@@ -40,15 +40,20 @@ try await CaptionAuthor.writeVTT(cues, to: outputVTT)
 | `Caption.load(_ url:)` | Auto-detect by extension; dispatches to `load(srt:)` / `load(vtt:)` / `load(itt:)` / `load(ass:)` / `load(ssa:)` |
 | `Caption.load(srt:)` / `load(vtt:)` / `load(itt:)` / `load(ass:)` / `load(ssa:)` *(v0.4)* | Async file loaders; SRT / ASS / SSA loaders have UTF-8 + Windows-1252 fallback |
 | `Caption.loadStyled(vtt:)` *(v0.3)* | Async loader producing `StyledCaption` (preserves cue settings + inline tags) |
+| `Caption.loadStyled(ass:)` / `loadStyled(ssa:)` *(v0.5)* | Async styled ASS / SSA loaders — colour, bold / italic / underline, alignment |
+| `Caption.load(ebuTTD:)` / `CaptionParser.parseEBUTTD(_:)` *(v0.6)* | EBU-TT-D (European broadcast TTML) loader and parser |
 | `CaptionParser.parseSRT(_:)` / `parseVTT(_:)` / `parseITT(_:)` / `parseASS(_:)` / `parseSSA(_:)` *(v0.4)* | Pure synchronous string parsers |
-| `CaptionParser.parseStyledVTT(_:)` *(v0.3)* | Styled VTT parser — preserves alignment / line / position / bold / italic / speaker / classes |
+| `CaptionParser.parseStyledVTT(_:)` *(v0.3)* | Styled VTT parser — preserves alignment / line / position / bold / italic / speaker / classes, and WebVTT regions as `StyledCaption.region` *(v0.6)* |
+| `CaptionParser.parseStyledASS(_:)` / `parseStyledSSA(_:)` *(v0.5)* | Styled ASS / SSA parsers |
 | `CaptionAuthor.writeSRT(_:to:)` / `writeVTT(_:to:)` / `writeITT(_:to:)` / `writeASS(_:to:)` / `writeSSA(_:to:)` *(v0.4)* | Async writers (UTF-8, LF) |
 | `CaptionAuthor.renderSRT(_:)` / `renderVTT(_:)` / `renderITT(_:)` / `renderASS(_:)` / `renderSSA(_:)` *(v0.4)* | Pure render helpers (string form) |
 | `StyledCaption.toTextOverlay(baseStyle:animation:)` *(v0.3)* | Bridge to `Kadr.TextOverlay` for burned-in styled captions |
 | `Video.styledCaptions(_:baseStyle:animation:)` *(v0.3)* | Overlay every styled cue with per-cue visibility |
+| `CaptionParser.parseVobSubIndex(_:)` / `Caption.fromVobSubIndex(_:placeholderText:trailingDuration:)` *(v0.6)* | VobSub `.idx` parser; placeholder cues timed from the index |
 | `CaptionParser.extractVobSubBitmaps(idx:sub:)` *(v0.7)* | Async `[VobSubBitmap]` — RLE-decoded SPU bitmaps for iPhone-era DVD subtitle pairs |
+| `Caption.shifted(by:)` / `scaled(by:)` *(v0.5)* | Shift or scale cue timing to match a re-encoded or re-timed video (also on `[Caption]`) |
 | `Caption.split(at:)` *(v0.7)* | Cleave a cue at an absolute timestamp into a pair |
-| `Caption.snappedToFrameRate(_:)` *(v0.7)* | Round cue boundaries to the nearest frame (23.976 / 24 / 25 / 29.97 / 30 / 60) |
+| `Caption.snappedToFrameRate(_:)` *(v0.7)* | Round cue boundaries to the nearest frame (23.976 / 24 / 25 / 29.97 / 30 / 60; also on `[Caption]`) |
 | `Array<Caption>.merged(within:)` *(v0.7)* | Collapse adjacent / overlapping cues whose gap is ≤ threshold (newline-joined text) |
 | `CaptionParseError` | Typed errors with source-line metadata |
 
@@ -62,11 +67,12 @@ See [ROADMAP.md](ROADMAP.md). Shipped: SRT + VTT (v0.1.0), iTT (v0.2.0), styled 
 
 ## Installation
 
+<!-- readme-snippets: skip -->
 ```swift
 .package(url: "https://github.com/SteliyanH/kadr-captions.git", .upToNextMinor(from: "0.13.0")),
 ```
 
-Add `KadrCaptions` to your target's dependencies. `Kadr` is pulled in transitively — 0.10.x resolves `>=0.17.0, <0.18.0`.
+Add `KadrCaptions` to your target's dependencies. `Kadr` is pulled in transitively — 0.13.x resolves kadr `>=1.2.0, <2.0.0`.
 
 > **Use `.upToNextMinor`, not `from:`.** `from:` means `.upToNextMajor`, and SwiftPM does not special-case `0.x` — so `from: "0.13.0"` would accept every future 0.x release including breaking ones. (This package's own kadr dependency uses `from:`, because kadr is past 1.0 and its minors no longer break.)
 

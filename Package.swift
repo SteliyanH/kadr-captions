@@ -26,6 +26,17 @@ let package = Package(
                 .swiftLanguageMode(.v6)
             ]
         ),
+        // The README's ```swift blocks, copied here by Tools/readme-snippets.sh
+        // so they compile against the API they demonstrate. Not a product.
+        .target(
+            name: "KadrCaptionsExamples",
+            dependencies: [
+                "KadrCaptions",
+                .product(name: "Kadr", package: "kadr"),
+            ],
+            path: "Examples",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "KadrCaptionsTests",
             dependencies: ["KadrCaptions"]

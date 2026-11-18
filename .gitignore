@@ -1,6 +1,11 @@
 # Swift / SwiftPM
 .build/
-.swiftpm/
+.swiftpm/*
+# ...except the shared scheme CI builds for iOS: it includes the examples
+# target, which no auto-generated scheme does.
+!.swiftpm/xcode/
+.swiftpm/xcode/*
+!.swiftpm/xcode/xcshareddata/
 Package.resolved
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
